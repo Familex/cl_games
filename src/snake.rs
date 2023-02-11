@@ -60,7 +60,7 @@ pub struct SnakeGame {
 impl Game for SnakeGame {
     type Settings = Point;
     type Input = Input;
-    // None if the game is over, otherwise return if the snake ate an apple
+    // None if the game is over, otherwise [`is_apple_eaten`]
     type Events = Option<bool>;
 
     /// Create a new game instance with the given settings.
@@ -101,24 +101,24 @@ impl Game for SnakeGame {
     ///
     /// Returns true if the snake ate an apple.
     fn update(&mut self, input: &Self::Input, delta_time: &std::time::Duration) -> Self::Events {
-        let mut is_apple_eaten = false;
-        let mut is_collided = false;
         self.duration += *delta_time;
 
         // Check for collisions
-        // Modifies is_collided
-        {
+        let is_collided = {
+            let mut is_collided = false;
             for point in self.snake.tail.iter() {
                 if self.snake.head == *point {
                     is_collided = true;
                 }
             }
-        }
+            is_collided
+        };
 
         // Check for eating food
-        // Modifies is_apple_eaten and self.apples
-        {
+        // Modifies self.apples
+        let is_apple_eaten = {
             let mut i = 0;
+            let mut is_apple_eaten = false;
             while i < self.apples.len() {
                 if self.snake.head == self.apples[i].0 {
                     is_apple_eaten = true;
@@ -127,7 +127,8 @@ impl Game for SnakeGame {
                     i += 1;
                 }
             }
-        }
+            is_apple_eaten
+        };
 
         // Spawn food
         // Zeroes duration if food is spawned
@@ -148,54 +149,66 @@ impl Game for SnakeGame {
         // Depends on is_apple_eaten
         // Modifies self.snake and self.prev_non_empty_input
         {
-            let (max_x, max_y) = terminal::size().expect("Failed to get terminal size");
+            let size = terminal::size().expect("Failed to get terminal size");
+            let (max_x, max_y) = (size.0 as i32, size.1 as i32);
 
             // Move the tail
             self.snake.tail.push(self.snake.head.clone());
+            // Don't grow the tail if an apple wasn't eaten
             if !is_apple_eaten {
                 self.snake.tail.remove(0);
             }
 
-            let curr_input = if input.empty() {
-                self.prev_non_empty_input
-            } else {
+            let curr_input = if !input.empty()
+                && ((*input).up && !self.prev_non_empty_input.down
+                    || (*input).down && !self.prev_non_empty_input.up
+                    || (*input).left && !self.prev_non_empty_input.right
+                    || (*input).right && !self.prev_non_empty_input.left)
+            {
                 *input
+            } else {
+                self.prev_non_empty_input
             };
 
-            // Move the head
-            if curr_input.up {
-                if self.snake.head.y <= 0 {
-                    self.snake.head.y = max_y as i32;
-                } else {
-                    self.snake.head.y -= 1;
+            // Calculate deltas
+            let deltas = {
+                let mut deltas = Point { x: 0, y: 0 };
+                if curr_input.up {
+                    deltas.y -= 1;
                 }
-            }
-            if curr_input.down {
-                if self.snake.head.y >= max_y as i32 {
-                    self.snake.head.y = 0;
-                } else {
-                    self.snake.head.y += 1;
+                if curr_input.down {
+                    deltas.y += 1;
                 }
-            }
-            if curr_input.left {
-                if self.snake.head.x <= 0 {
-                    self.snake.head.x = max_x as i32;
-                } else {
-                    self.snake.head.x -= 1;
+                if curr_input.left {
+                    deltas.x -= 1;
                 }
-            }
-            if curr_input.right {
-                if self.snake.head.x >= max_x as i32 {
+                if curr_input.right {
+                    deltas.x += 1;
+                }
+                deltas
+            };
+
+            // Apply deltas
+            {
+                self.snake.head.x += deltas.x;
+                self.snake.head.y += deltas.y;
+
+                if self.snake.head.x < 0 {
+                    self.snake.head.x = max_x - 1;
+                }
+                if self.snake.head.x >= max_x {
                     self.snake.head.x = 0;
-                } else {
-                    self.snake.head.x += 1;
+                }
+                if self.snake.head.y < 0 {
+                    self.snake.head.y = max_y - 1;
+                }
+                if self.snake.head.y >= max_y {
+                    self.snake.head.y = 0;
                 }
             }
 
-            if !curr_input.empty() && *input != self.prev_non_empty_input {
-                self.prev_non_empty_input = curr_input;
-            }
-        }
+            self.prev_non_empty_input = curr_input;
+        };
 
         if is_collided {
             None
