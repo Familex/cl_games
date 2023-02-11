@@ -150,13 +150,46 @@ impl Game for SnakeGame {
         // Spawn food
         // Zeroes duration if food is spawned
         if self.duration > APPLES_SPAWN_RATE {
-            let (max_x, max_y) = get_terminal_size();
-
             if self.apples.len() < APPLES_MAX {
-                self.apples.push(Apple(Point {
-                    x: (rand::random::<u32>() % (max_x as u32)) as i32,
-                    y: (rand::random::<u32>() % (max_y as u32)) as i32,
-                }));
+                /// Check if the given coordinates are on the snake
+                fn is_on_snake(snake: &Snake, coords: Point) -> bool {
+                    if coords == snake.head {
+                        return true;
+                    }
+                    for point in snake.tail.iter() {
+                        if coords == *point {
+                            return true;
+                        }
+                    }
+                    false
+                }
+
+                /// Check if the given coordinates are on an apple
+                fn is_on_apple(coords: Point, apples: &Vec<Apple>) -> bool {
+                    for apple in apples.iter() {
+                        if coords == apple.0 {
+                            return true;
+                        }
+                    }
+                    false
+                }
+
+                /// Get a random position on the screen (scoreboard excluded)
+                fn random_position() -> Point {
+                    let (max_x, max_y) = get_terminal_size();
+                    Point {
+                        x: (rand::random::<u32>() % (max_x as u32)) as i32,
+                        y: ((rand::random::<u32>() + 1) % (max_y as u32)) as i32,
+                    }
+                }
+
+                let mut apple_coords = random_position();
+                while is_on_snake(&self.snake, apple_coords)
+                    || is_on_apple(apple_coords, &self.apples)
+                {
+                    apple_coords = random_position();
+                }
+                self.apples.push(Apple(apple_coords));
             }
 
             self.duration = std::time::Duration::from_secs(0);
