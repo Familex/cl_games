@@ -1,6 +1,5 @@
 use crate::game::*;
-use colored::Colorize;
-use crossterm::{cursor, execute, terminal};
+use crossterm::{cursor, execute, style::Stylize, terminal};
 
 const APPLES_MAX: usize = 5;
 
@@ -12,6 +11,14 @@ pub struct Point {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Apple(Point);
+
+pub struct Score(u32);
+
+impl std::ops::AddAssign<i32> for Score {
+    fn add_assign(&mut self, rhs: i32) {
+        self.0 += rhs as u32;
+    }
+}
 
 pub struct Snake {
     pub head: Point,
@@ -55,6 +62,7 @@ pub struct SnakeGame {
     pub apples: Vec<Apple>,
     pub prev_non_empty_input: Input,
     pub duration: std::time::Duration,
+    pub score: Score,
 }
 
 impl Game for SnakeGame {
@@ -93,6 +101,7 @@ impl Game for SnakeGame {
                 left: false,
                 right: true, // Start moving right
             },
+            score: Score { 0: 0 },
         }
     }
 
@@ -101,6 +110,7 @@ impl Game for SnakeGame {
     ///
     /// Returns true if the snake ate an apple.
     fn update(&mut self, input: &Self::Input, delta_time: &std::time::Duration) -> Self::Events {
+        /// Get the terminal size in rectangular characters
         fn get_terminal_size() -> (i32, i32) {
             let size = terminal::size().expect("Failed to get terminal size");
             (size.0 as i32 / 2, size.1 as i32)
@@ -120,13 +130,14 @@ impl Game for SnakeGame {
         };
 
         // Check for eating food
-        // Modifies self.apples
+        // Modifies self.apples and self.score
         let is_apple_eaten = {
             let mut i = 0;
             let mut is_apple_eaten = false;
             while i < self.apples.len() {
                 if self.snake.head == self.apples[i].0 {
                     is_apple_eaten = true;
+                    self.score += 1;
                     self.apples.remove(i);
                 } else {
                     i += 1;
@@ -229,6 +240,9 @@ impl Game for SnakeGame {
     ) -> crossterm::Result<()> {
         use cursor::MoveTo;
         use std::io::Write;
+        use terminal::size;
+
+        let (max_x, _max_y) = size().expect("Failed to get terminal size");
 
         // Draw snake
         {
@@ -249,6 +263,25 @@ impl Game for SnakeGame {
                 execute!(out, MoveTo(apple.0.x as u16 * 2, apple.0.y as u16))?;
                 write!(out, "{}", "<>".red())?;
             }
+        }
+
+        // Draw score
+        {
+            execute!(out, MoveTo(max_x / 2, 0))?;
+            let score = format!("{}", self.score.0);
+            write!(
+                out,
+                "Score: {}",
+                if self.score.0 < 10 {
+                    score.white()
+                } else if self.score.0 < 40 {
+                    score.green()
+                } else if self.score.0 < 100 {
+                    score.yellow()
+                } else {
+                    score.red()
+                }
+            )?;
         }
 
         // Reset cursor
