@@ -101,6 +101,11 @@ impl Game for SnakeGame {
     ///
     /// Returns true if the snake ate an apple.
     fn update(&mut self, input: &Self::Input, delta_time: &std::time::Duration) -> Self::Events {
+        fn get_terminal_size() -> (i32, i32) {
+            let size = terminal::size().expect("Failed to get terminal size");
+            (size.0 as i32 / 2, size.1 as i32)
+        }
+
         self.duration += *delta_time;
 
         // Check for collisions
@@ -133,7 +138,7 @@ impl Game for SnakeGame {
         // Spawn food
         // Zeroes duration if food is spawned
         if self.duration > std::time::Duration::from_secs(3) {
-            let (max_x, max_y) = terminal::size().expect("Failed to get terminal size");
+            let (max_x, max_y) = get_terminal_size();
 
             if self.apples.len() < APPLES_MAX {
                 self.apples.push(Apple(Point {
@@ -149,8 +154,7 @@ impl Game for SnakeGame {
         // Depends on is_apple_eaten
         // Modifies self.snake and self.prev_non_empty_input
         {
-            let size = terminal::size().expect("Failed to get terminal size");
-            let (max_x, max_y) = (size.0 as i32, size.1 as i32);
+            let (max_x, max_y) = get_terminal_size();
 
             // Move the tail
             self.snake.tail.push(self.snake.head.clone());
@@ -229,21 +233,21 @@ impl Game for SnakeGame {
         // Draw snake
         {
             for point in self.snake.tail.iter() {
-                execute!(out, MoveTo(point.x as u16, point.y as u16))?;
-                write!(out, "{}", "x")?;
+                execute!(out, MoveTo(point.x as u16 * 2, point.y as u16))?;
+                write!(out, "{}", "++")?;
             }
             execute!(
                 out,
-                MoveTo(self.snake.head.x as u16, self.snake.head.y as u16)
+                MoveTo(self.snake.head.x as u16 * 2, self.snake.head.y as u16)
             )?;
-            write!(out, "{}", "o".green())?;
+            write!(out, "{}", "||".green())?;
         }
 
         // Draw apples
         {
             for apple in self.apples.iter() {
-                execute!(out, MoveTo(apple.0.x as u16, apple.0.y as u16))?;
-                write!(out, "{}", "я".red())?;
+                execute!(out, MoveTo(apple.0.x as u16 * 2, apple.0.y as u16))?;
+                write!(out, "{}", "<>".red())?;
             }
         }
 
