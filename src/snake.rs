@@ -2,6 +2,7 @@ use crate::game::*;
 use crossterm::{cursor, execute, style::Stylize, terminal};
 
 const APPLES_MAX: usize = 5;
+const APPLES_SPAWN_RATE: std::time::Duration = std::time::Duration::from_secs(2);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Point {
@@ -148,7 +149,7 @@ impl Game for SnakeGame {
 
         // Spawn food
         // Zeroes duration if food is spawned
-        if self.duration > std::time::Duration::from_secs(3) {
+        if self.duration > APPLES_SPAWN_RATE {
             let (max_x, max_y) = get_terminal_size();
 
             if self.apples.len() < APPLES_MAX {
@@ -158,7 +159,7 @@ impl Game for SnakeGame {
                 }));
             }
 
-            self.duration = std::time::Duration::from_millis(0);
+            self.duration = std::time::Duration::from_secs(0);
         }
 
         // Move snake
@@ -267,7 +268,22 @@ impl Game for SnakeGame {
 
         // Draw score
         {
-            execute!(out, MoveTo(max_x / 2, 0))?;
+            fn digits_num(num: u32) -> u16 {
+                if num == 0 {
+                    1
+                } else {
+                    f32::floor(f32::log10(num as f32) + 1.0) as u16
+                }
+            }
+
+            let score_hint = "Score: ";
+            execute!(
+                out,
+                MoveTo(
+                    (max_x - score_hint.len() as u16 - digits_num(self.score.0)) / 2,
+                    0
+                )
+            )?;
             let score = format!("{}", self.score.0);
             write!(
                 out,
