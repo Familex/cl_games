@@ -1,2 +1,1 @@
-console games written in rust
-
+Console games written in rust.
