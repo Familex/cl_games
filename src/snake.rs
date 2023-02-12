@@ -58,6 +58,26 @@ impl Input {
     }
 }
 
+/// Read the input from the given input stream.
+fn read_to_input(event: &Option<crossterm::event::KeyEvent>) -> Input {
+    use crossterm::event::KeyCode;
+
+    let mut input = Input::new();
+
+    // Handle pressed keys
+    if let Some(key_event) = event {
+        match key_event.code {
+            KeyCode::Up => input.up = true,
+            KeyCode::Down => input.down = true,
+            KeyCode::Left => input.left = true,
+            KeyCode::Right => input.right = true,
+            _ => {}
+        }
+    }
+
+    input
+}
+
 pub struct SnakeGame {
     pub snake: Snake,
     pub apples: Vec<Apple>,
@@ -67,50 +87,18 @@ pub struct SnakeGame {
 }
 
 impl Game for SnakeGame {
-    type Settings = Point;
-    type Input = Input;
     // None if the game is over, otherwise [`is_apple_eaten`]
     type Events = Option<bool>;
-
-    /// Create a new game instance with the given settings.
-    /// Snake starts at the given point and moves right.
-    /// Tail is 2 points long.
-    fn new(setup: Self::Settings) -> Self {
-        Self {
-            snake: Snake {
-                head: setup,
-                tail: vec![
-                    Point {
-                        x: setup.x - 1,
-                        y: setup.y,
-                    },
-                    Point {
-                        x: setup.x - 2,
-                        y: setup.y,
-                    },
-                    Point {
-                        x: setup.x - 3,
-                        y: setup.y,
-                    },
-                ],
-            },
-            apples: Vec::new(),
-            duration: std::time::Duration::from_millis(2),
-            prev_non_empty_input: Input {
-                up: false,
-                down: false,
-                left: false,
-                right: true, // Start moving right
-            },
-            score: Score { 0: 0 },
-        }
-    }
 
     /// Move the snake in the direction of the last non-empty input.
     /// If the snake hits the edge of the screen, it wraps around to the other side.
     ///
     /// Returns true if the snake ate an apple.
-    fn update(&mut self, input: &Self::Input, delta_time: &std::time::Duration) -> Self::Events {
+    fn update(
+        &mut self,
+        input: &Option<crossterm::event::KeyEvent>,
+        delta_time: &std::time::Duration,
+    ) -> Self::Events {
         /// Get the terminal size in rectangular characters
         fn get_terminal_size() -> (i32, i32) {
             let size = terminal::size().expect("Failed to get terminal size");
@@ -200,6 +188,7 @@ impl Game for SnakeGame {
         // Modifies self.snake and self.prev_non_empty_input
         {
             let (max_x, max_y) = get_terminal_size();
+            let input = read_to_input(input);
 
             // Move the tail
             self.snake.tail.push(self.snake.head.clone());
@@ -209,12 +198,12 @@ impl Game for SnakeGame {
             }
 
             let curr_input = if !input.empty()
-                && ((*input).up && !self.prev_non_empty_input.down
-                    || (*input).down && !self.prev_non_empty_input.up
-                    || (*input).left && !self.prev_non_empty_input.right
-                    || (*input).right && !self.prev_non_empty_input.left)
+                && (input.up && !self.prev_non_empty_input.down
+                    || input.down && !self.prev_non_empty_input.up
+                    || input.left && !self.prev_non_empty_input.right
+                    || input.right && !self.prev_non_empty_input.left)
             {
-                *input
+                input
             } else {
                 self.prev_non_empty_input
             };
@@ -336,23 +325,40 @@ impl Game for SnakeGame {
         // Reset cursor
         execute!(out, MoveTo(0, 0))
     }
+}
 
-    fn read_to_input(&self, event: &Option<crossterm::event::KeyEvent>) -> Self::Input {
-        use crossterm::event::KeyCode;
-
-        let mut input = Input::new();
-
-        // Handle pressed keys
-        if let Some(key_event) = event {
-            match key_event.code {
-                KeyCode::Up => input.up = true,
-                KeyCode::Down => input.down = true,
-                KeyCode::Left => input.left = true,
-                KeyCode::Right => input.right = true,
-                _ => {}
-            }
+impl SnakeGame {
+    /// Create a new game instance with the given settings.
+    /// Snake starts at the given point and moves right.
+    /// Tail is 2 points long.
+    pub fn new(setup: Point) -> Self {
+        Self {
+            snake: Snake {
+                head: setup,
+                tail: vec![
+                    Point {
+                        x: setup.x - 1,
+                        y: setup.y,
+                    },
+                    Point {
+                        x: setup.x - 2,
+                        y: setup.y,
+                    },
+                    Point {
+                        x: setup.x - 3,
+                        y: setup.y,
+                    },
+                ],
+            },
+            apples: Vec::new(),
+            duration: std::time::Duration::from_millis(2),
+            prev_non_empty_input: Input {
+                up: false,
+                down: false,
+                left: false,
+                right: true, // Start moving right
+            },
+            score: Score { 0: 0 },
         }
-
-        input
     }
 }

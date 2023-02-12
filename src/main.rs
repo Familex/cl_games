@@ -10,9 +10,8 @@ fn main() -> crossterm::Result<()> {
     let mut stdout = std::io::stdout();
     let stdin_chan = spawn_stdin_channel();
     let settings = Point { x: 10, y: 10 };
-    let mut game: SnakeGame = SnakeGame::new(settings);
+    let mut game: Box<dyn Game<Events = _>> = Box::new(SnakeGame::new(settings));
     let mut prev_time = std::time::SystemTime::now();
-    let mut input = snake::Input::new();
 
     loop {
         use std::thread;
@@ -25,7 +24,10 @@ fn main() -> crossterm::Result<()> {
         execute!(stdout, Clear(ClearType::All))?;
 
         // Update the game state
-        match game.update(&input, &current_time.duration_since(prev_time).unwrap()) {
+        match game.update(
+            &read_input(&stdin_chan),
+            &current_time.duration_since(prev_time).unwrap(),
+        ) {
             None => panic!("Game over!"),
             _ => {}
         }
@@ -35,9 +37,6 @@ fn main() -> crossterm::Result<()> {
             &mut stdout,
             &current_time.duration_since(prev_time).unwrap(),
         )?;
-
-        // Read the input
-        input = game.read_to_input(&read_input(&stdin_chan));
 
         // Wait for the next frame
         thread::sleep(Duration::from_millis(100));
