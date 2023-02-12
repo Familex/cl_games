@@ -8,7 +8,7 @@ pub trait Game {
         &mut self,
         input: &Option<crossterm::event::KeyEvent>,
         delta_time: &std::time::Duration,
-    ) -> Self::Events;
+    ) -> Box<Self::Events>;
 
     /// Draw the game state to the given output.
     fn draw(

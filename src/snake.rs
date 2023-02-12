@@ -43,6 +43,12 @@ pub struct Input {
     pub right: bool,
 }
 
+impl Default for Input {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Input {
     pub fn new() -> Self {
         Self {
@@ -98,7 +104,7 @@ impl Game for SnakeGame {
         &mut self,
         input: &Option<crossterm::event::KeyEvent>,
         delta_time: &std::time::Duration,
-    ) -> Self::Events {
+    ) -> Box<Self::Events> {
         /// Get the terminal size in rectangular characters
         fn get_terminal_size() -> (i32, i32) {
             let size = terminal::size().expect("Failed to get terminal size");
@@ -153,7 +159,7 @@ impl Game for SnakeGame {
                 }
 
                 /// Check if the given coordinates are on an apple
-                fn is_on_apple(coords: Point, apples: &Vec<Apple>) -> bool {
+                fn is_on_apple(coords: Point, apples: &[Apple]) -> bool {
                     for apple in apples.iter() {
                         if coords == apple.0 {
                             return true;
@@ -191,7 +197,7 @@ impl Game for SnakeGame {
             let input = read_to_input(input);
 
             // Move the tail
-            self.snake.tail.push(self.snake.head.clone());
+            self.snake.tail.push(self.snake.head);
             // Don't grow the tail if an apple wasn't eaten
             if !is_apple_eaten {
                 self.snake.tail.remove(0);
@@ -249,9 +255,9 @@ impl Game for SnakeGame {
         };
 
         if is_collided {
-            None
+            Box::new(None)
         } else {
-            Some(is_apple_eaten)
+            Box::new(Some(is_apple_eaten))
         }
     }
 
@@ -271,7 +277,7 @@ impl Game for SnakeGame {
         {
             for point in self.snake.tail.iter() {
                 execute!(out, MoveTo(point.x as u16 * 2, point.y as u16))?;
-                write!(out, "{}", "++")?;
+                write!(out, "++")?;
             }
             execute!(
                 out,
@@ -358,7 +364,7 @@ impl SnakeGame {
                 left: false,
                 right: true, // Start moving right
             },
-            score: Score { 0: 0 },
+            score: Score(0),
         }
     }
 }

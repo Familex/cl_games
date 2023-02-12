@@ -7,10 +7,12 @@ fn main() -> crossterm::Result<()> {
     use snake::{Point, SnakeGame};
     use terminal::{Clear, ClearType};
 
+    // What diff with to_owned and into? https://stackoverflow.com/questions/30109044/what-is-the-difference-between-to-owned-and-into
+
     let mut stdout = std::io::stdout();
     let stdin_chan = spawn_stdin_channel();
     let settings = Point { x: 10, y: 10 };
-    let mut game: Box<dyn Game<Events = _>> = Box::new(SnakeGame::new(settings));
+    let mut game: Box<dyn Game<Events = Option<bool>>> = Box::new(SnakeGame::new(settings));
     let mut prev_time = std::time::SystemTime::now();
 
     loop {
@@ -24,12 +26,13 @@ fn main() -> crossterm::Result<()> {
         execute!(stdout, Clear(ClearType::All))?;
 
         // Update the game state
-        match game.update(
+        if (*game.update(
             &read_input(&stdin_chan),
             &current_time.duration_since(prev_time).unwrap(),
-        ) {
-            None => panic!("Game over!"),
-            _ => {}
+        ))
+        .is_none()
+        {
+            panic!("Game over!")
         }
 
         // Draw the game state
@@ -52,10 +55,8 @@ fn spawn_stdin_channel() -> std::sync::mpsc::Receiver<crossterm::event::KeyEvent
     use std::thread;
 
     thread::spawn(move || loop {
-        if let Ok(event) = read() {
-            if let Event::Key(key) = event {
-                tx.send(key).unwrap();
-            }
+        if let Ok(Event::Key(key)) = read() {
+            tx.send(key).unwrap();
         }
     });
     rx
@@ -66,12 +67,13 @@ fn read_input(
 ) -> Option<crossterm::event::KeyEvent> {
     use std::sync::mpsc::TryRecvError;
 
-    let result;
-    match rx.try_recv() {
-        Ok(input) => result = Some(input),
+    let result = match rx.try_recv() {
+        Ok(input) => Some(input),
         Err(TryRecvError::Disconnected) => panic!("stdin disconnected"),
-        Err(TryRecvError::Empty) => result = None,
-    }
+        Err(TryRecvError::Empty) => None,
+    };
+
+    // Skip all other inputs
     loop {
         match rx.try_recv() {
             Ok(_) => {}
@@ -79,5 +81,6 @@ fn read_input(
             Err(TryRecvError::Empty) => break,
         }
     }
+
     result
 }
