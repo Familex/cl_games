@@ -1,10 +1,12 @@
 extern crate static_assertions as sa;
 pub mod game;
 pub mod snake;
+pub mod tetris;
 
 enum MenuChoice {
     Exit = 0,
     SnakeGame = 1,
+    TetrisGame = 2,
 }
 
 fn main() -> crossterm::Result<()> {
@@ -28,6 +30,7 @@ fn main() -> crossterm::Result<()> {
                 println!("Choose a game:");
                 println!("   {}. Exit", MenuChoice::Exit as usize);
                 println!("   {}. Snake", MenuChoice::SnakeGame as usize);
+                println!("   {}. Tetris", MenuChoice::TetrisGame as usize);
 
                 choice = read_game_choice();
 
@@ -38,6 +41,7 @@ fn main() -> crossterm::Result<()> {
             choice
         } {
             Some(MenuChoice::SnakeGame) => game = Box::new(SnakeGame::new(settings)),
+            Some(MenuChoice::TetrisGame) => game = Box::new(tetris::TetrisGame::new()),
             Some(MenuChoice::Exit) => break 'main_loop,
             None => unreachable!(),
         }
@@ -129,10 +133,12 @@ fn read_game_choice() -> Option<MenuChoice> {
 
     sa::const_assert!(MenuChoice::Exit as usize == 0);
     sa::const_assert!(MenuChoice::SnakeGame as usize == 1);
+    sa::const_assert!(MenuChoice::TetrisGame as usize == 2);
 
     match choice {
         0 => Some(MenuChoice::Exit),
         1 => Some(MenuChoice::SnakeGame),
+        2 => Some(MenuChoice::TetrisGame),
         _ => None,
     }
 }
