@@ -78,6 +78,8 @@ fn main() -> crossterm::Result<()> {
 
         println!("Game over! Score: {}", game.get_score());
         println!("Press any key to restart.");
+        // Wait for prevent the game from restarting immediately
+        std::thread::sleep(std::time::Duration::from_millis(750));
         _ = read();
     }
 
