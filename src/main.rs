@@ -2,9 +2,9 @@ extern crate static_assertions as sa;
 pub mod game;
 pub mod snake;
 
-enum GameChoice {
-    None = 0,
-    Snake = 1,
+enum MenuChoice {
+    Exit = 0,
+    SnakeGame = 1,
 }
 
 fn main() -> crossterm::Result<()> {
@@ -26,8 +26,8 @@ fn main() -> crossterm::Result<()> {
             'input_read: loop {
                 execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0))?;
                 println!("Choose a game:");
-                println!("   {}. Exit", GameChoice::None as usize);
-                println!("   {}. Snake", GameChoice::Snake as usize);
+                println!("   {}. Exit", MenuChoice::Exit as usize);
+                println!("   {}. Snake", MenuChoice::SnakeGame as usize);
 
                 choice = read_game_choice();
 
@@ -37,8 +37,8 @@ fn main() -> crossterm::Result<()> {
             }
             choice
         } {
-            Some(GameChoice::Snake) => game = Box::new(SnakeGame::new(settings)),
-            Some(GameChoice::None) => break 'main_loop,
+            Some(MenuChoice::SnakeGame) => game = Box::new(SnakeGame::new(settings)),
+            Some(MenuChoice::Exit) => break 'main_loop,
             None => unreachable!(),
         }
 
@@ -120,19 +120,19 @@ fn read_input(
     result
 }
 
-fn read_game_choice() -> Option<GameChoice> {
+fn read_game_choice() -> Option<MenuChoice> {
     use std::io::stdin;
 
     let mut input = String::new();
     stdin().read_line(&mut input).ok()?;
     let choice = input.trim().parse::<usize>().ok()?;
 
-    sa::const_assert!(GameChoice::None as usize == 0);
-    sa::const_assert!(GameChoice::Snake as usize == 1);
+    sa::const_assert!(MenuChoice::Exit as usize == 0);
+    sa::const_assert!(MenuChoice::SnakeGame as usize == 1);
 
     match choice {
-        0 => Some(GameChoice::None),
-        1 => Some(GameChoice::Snake),
+        0 => Some(MenuChoice::Exit),
+        1 => Some(MenuChoice::SnakeGame),
         _ => None,
     }
 }
