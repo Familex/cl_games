@@ -93,9 +93,6 @@ pub struct SnakeGame {
 }
 
 impl Game for SnakeGame {
-    // None if the game is over, otherwise [`is_apple_eaten`]
-    type Events = Option<bool>;
-
     /// Move the snake in the direction of the last non-empty input.
     /// If the snake hits the edge of the screen, it wraps around to the other side.
     ///
@@ -104,7 +101,7 @@ impl Game for SnakeGame {
         &mut self,
         input: &Option<crossterm::event::KeyEvent>,
         delta_time: &std::time::Duration,
-    ) -> Box<Self::Events> {
+    ) -> bool {
         /// Get the terminal size in rectangular characters
         fn get_terminal_size() -> (i32, i32) {
             let size = terminal::size().expect("Failed to get terminal size");
@@ -254,11 +251,7 @@ impl Game for SnakeGame {
             self.prev_non_empty_input = curr_input;
         };
 
-        if is_collided {
-            Box::new(None)
-        } else {
-            Box::new(Some(is_apple_eaten))
-        }
+        !is_collided
     }
 
     /// Draw the snake to the screen.
@@ -330,6 +323,10 @@ impl Game for SnakeGame {
 
         // Reset cursor
         execute!(out, MoveTo(0, 0))
+    }
+
+    fn get_score(&self) -> u32 {
+        self.score.0
     }
 }
 
