@@ -17,13 +17,13 @@ fn main() -> crossterm::Result<()> {
 
     let mut stdout = std::io::stdout();
     let stdin_chan = spawn_stdin_channel();
-    let settings = Point { x: 10, y: 10 };
-    let mut game: Box<dyn Game>;
-    let mut prev_time = std::time::SystemTime::now();
 
     'main_loop: loop {
-        // Menu
-        match {
+        // Create all games on stack
+        let (mut snake, mut tetris);
+
+        // Make game from player choice
+        let game: &mut dyn Game = match {
             let mut choice;
             'input_read: loop {
                 execute!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0))?;
@@ -40,11 +40,20 @@ fn main() -> crossterm::Result<()> {
             }
             choice
         } {
-            Some(MenuChoice::SnakeGame) => game = Box::new(SnakeGame::new(settings)),
-            Some(MenuChoice::TetrisGame) => game = Box::new(tetris::TetrisGame::new()),
+            Some(MenuChoice::SnakeGame) => {
+                snake = SnakeGame::new(Point { x: 10, y: 10 });
+                &mut snake
+            }
+            Some(MenuChoice::TetrisGame) => {
+                tetris = tetris::TetrisGame::new();
+                &mut tetris
+            }
+
             Some(MenuChoice::Exit) => break 'main_loop,
             None => unreachable!(),
-        }
+        };
+
+        let mut prev_time = std::time::SystemTime::now();
 
         'game_loop: loop {
             use std::thread;
