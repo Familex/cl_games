@@ -1,11 +1,17 @@
+pub enum UpdateEvent {
+    GameOver,
+    GameContinue,
+}
+
 /// A trait that defines the interface for a game.
 pub trait Game {
     /// Update the game state with the given input.
+    /// Returns false on game end.
     fn update(
         &mut self,
         input: &Option<crossterm::event::KeyEvent>,
         delta_time: &std::time::Duration,
-    ) -> bool;
+    ) -> UpdateEvent;
 
     /// Draw the game state to the given output.
     fn draw(
@@ -14,5 +20,5 @@ pub trait Game {
         delta_time: &std::time::Duration,
     ) -> crossterm::Result<()>;
 
-    fn get_score(&self) -> u32;
+    fn get_score(&self) -> usize;
 }

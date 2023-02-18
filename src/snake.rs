@@ -1,4 +1,4 @@
-use crate::game::*;
+use crate::game::{Game, UpdateEvent};
 use crossterm::{cursor, execute, style::Stylize, terminal};
 
 const APPLES_MAX: usize = 5;
@@ -13,11 +13,11 @@ pub struct Point {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Apple(Point);
 
-pub struct Score(u32);
+pub struct Score(usize);
 
 impl std::ops::AddAssign<i32> for Score {
     fn add_assign(&mut self, rhs: i32) {
-        self.0 += rhs as u32;
+        self.0 += rhs as usize;
     }
 }
 
@@ -101,7 +101,7 @@ impl Game for SnakeGame {
         &mut self,
         input: &Option<crossterm::event::KeyEvent>,
         delta_time: &std::time::Duration,
-    ) -> bool {
+    ) -> UpdateEvent {
         /// Get the terminal size in rectangular characters
         fn get_terminal_size() -> (i32, i32) {
             let size = terminal::size().expect("Failed to get terminal size");
@@ -251,7 +251,11 @@ impl Game for SnakeGame {
             self.prev_non_empty_input = curr_input;
         };
 
-        !is_collided
+        if is_collided {
+            UpdateEvent::GameOver
+        } else {
+            UpdateEvent::GameContinue
+        }
     }
 
     /// Draw the snake to the screen.
@@ -289,7 +293,7 @@ impl Game for SnakeGame {
 
         // Draw score
         {
-            fn digits_num(num: u32) -> u16 {
+            fn digits_num(num: usize) -> u16 {
                 if num == 0 {
                     1
                 } else {
@@ -325,7 +329,7 @@ impl Game for SnakeGame {
         execute!(out, MoveTo(0, 0))
     }
 
-    fn get_score(&self) -> u32 {
+    fn get_score(&self) -> usize {
         self.score.0
     }
 }

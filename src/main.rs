@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports, unused_variables)]
+
 extern crate static_assertions as sa;
 pub mod game;
 pub mod snake;
@@ -7,6 +9,20 @@ enum MenuChoice {
     Exit = 0,
     SnakeGame = 1,
     TetrisGame = 2,
+}
+
+fn main_() {
+    use tetris::{Figure, FigureType, Point};
+
+    let line = Figure::new(FigureType::Line, 0.0);
+    println!(
+        "{:?}",
+        line.applied_rotation_and_position(line.rotation, Point { x: 0.0, y: 0.0 })
+    );
+    println!(
+        "{:?}",
+        line.applied_rotation_and_position(std::f32::consts::PI / 2.0, Point { x: 0.0, y: 0.0 })
+    );
 }
 
 fn main() -> crossterm::Result<()> {
@@ -66,7 +82,7 @@ fn main() -> crossterm::Result<()> {
             execute!(stdout, Clear(ClearType::All))?;
 
             // Update the game state
-            if !game.update(
+            if let game::UpdateEvent::GameOver = game.update(
                 &read_input(&stdin_chan),
                 &current_time.duration_since(prev_time).unwrap(),
             ) {
@@ -109,6 +125,7 @@ fn spawn_stdin_channel() -> std::sync::mpsc::Receiver<crossterm::event::KeyEvent
             }
         }
     });
+
     rx
 }
 
