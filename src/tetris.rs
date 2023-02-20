@@ -13,6 +13,18 @@ const TO_DESCEND_FAST: Duration = Duration::from_millis(50);
 const MINIMUM_USER_INPUT_DISTANCE: Duration = Duration::from_millis(125);
 const INIT_FIGURE_POS: Point = Point { x: 3.0, y: 0.0 };
 const LOSE_LINE: f32 = 1.0;
+const NEXT_FIGURE_FRAME_FROM_BOARD_INDENT: usize = 2;
+const BORDER_WIDTH: usize = 2; // in symbols!
+const BORDER_HEIGHT: usize = 1;
+
+// #### to namespace
+const NEXT_FIGURE_FRAME_INDENT: usize =
+    BORDER_WIDTH * 2 + WIDTH * 2 + NEXT_FIGURE_FRAME_FROM_BOARD_INDENT;
+//                           ^^^ cells have 2-symbols width
+const NEXT_FIGURE_FRAME_WIDTH: usize = 5;
+const NEXT_FIGURE_FRAME_HEIGHT: usize = 5;
+const NEXT_FIGURE_FRAME_INDENT_UP: usize = 2;
+// #### to namespace
 
 enum UserInput {
     Left,
@@ -403,8 +415,6 @@ impl Game for TetrisGame {
         use crossterm::{cursor::MoveTo, execute};
         use std::io::Write;
 
-        const BORDER_WIDTH: u16 = 2;
-
         // Draw the board
         {
             // Draw cells
@@ -445,7 +455,7 @@ impl Game for TetrisGame {
                 execute!(
                     out,
                     MoveTo(
-                        BORDER_WIDTH + point.x.round() as u16 * 2,
+                        BORDER_WIDTH as u16 + point.x.round() as u16 * 2,
                         point.y.round() as u16
                     )
                 )?;
@@ -467,7 +477,7 @@ impl Game for TetrisGame {
             execute!(
                 out,
                 MoveTo(
-                    (WIDTH as u16 + BORDER_WIDTH * 2
+                    (WIDTH as u16 * 2 + BORDER_WIDTH as u16 * 2
                         - score_hint.len() as u16
                         - digits_num(self.score))
                         / 2,
@@ -491,6 +501,98 @@ impl Game for TetrisGame {
             )?;
         }
 
+        // Draw next figure
+        {
+            // Title
+            {
+                execute!(
+                    out,
+                    MoveTo(
+                        NEXT_FIGURE_FRAME_INDENT as u16 + 1,
+                        NEXT_FIGURE_FRAME_INDENT_UP as u16 - 1
+                    )
+                )?;
+                write!(out, "Next figure:")?;
+            }
+            // Draw border
+            {
+                // Up
+                {
+                    execute!(
+                        out,
+                        MoveTo(
+                            NEXT_FIGURE_FRAME_INDENT as u16,
+                            NEXT_FIGURE_FRAME_INDENT_UP as u16
+                        )
+                    )?;
+                    write!(out, " ╔")?;
+                    for _ in 0..NEXT_FIGURE_FRAME_WIDTH {
+                        write!(out, "══")?;
+                    }
+                    write!(out, "╗ ")?;
+                }
+
+                // Left and right
+                {
+                    for row in 0..NEXT_FIGURE_FRAME_HEIGHT {
+                        execute!(
+                            out,
+                            MoveTo(
+                                NEXT_FIGURE_FRAME_INDENT as u16,
+                                (NEXT_FIGURE_FRAME_INDENT_UP + BORDER_HEIGHT + row) as u16
+                            )
+                        )?;
+                        write!(out, " ║")?;
+                        execute!(
+                            out,
+                            MoveTo(
+                                (NEXT_FIGURE_FRAME_INDENT
+                                    + BORDER_WIDTH
+                                    + NEXT_FIGURE_FRAME_WIDTH * 2)
+                                    as u16,
+                                (NEXT_FIGURE_FRAME_INDENT_UP + BORDER_HEIGHT + row) as u16
+                            )
+                        )?;
+                        write!(out, "║ ")?;
+                    }
+                }
+
+                // Down
+                {
+                    execute!(
+                        out,
+                        MoveTo(
+                            NEXT_FIGURE_FRAME_INDENT as u16,
+                            (NEXT_FIGURE_FRAME_INDENT_UP + NEXT_FIGURE_FRAME_HEIGHT) as u16
+                        )
+                    )?;
+                    write!(out, " ╚")?;
+                    for _ in 0..NEXT_FIGURE_FRAME_WIDTH {
+                        write!(out, "══")?;
+                    }
+                    write!(out, "╝ ")?;
+                }
+            }
+            // Draw figure
+            {
+                for point in self.next_figure.applied_rotation_and_position(
+                    std::f32::consts::PI / 2.0,
+                    Point {
+                        x: (NEXT_FIGURE_FRAME_INDENT + BORDER_WIDTH + NEXT_FIGURE_FRAME_WIDTH / 2)
+                            as f32
+                            / 2.0,
+                        y: (NEXT_FIGURE_FRAME_INDENT_UP + NEXT_FIGURE_FRAME_HEIGHT / 2) as f32,
+                    },
+                ) {
+                    execute!(
+                        out,
+                        MoveTo(point.x.round() as u16 * 2, point.y.round() as u16)
+                    )?;
+                    draw_with_color(out, "██", self.next_figure.figure_type.get_color())?;
+                }
+            }
+        }
+
         execute!(out, MoveTo(0, 0))
     }
 
@@ -503,13 +605,12 @@ pub fn draw_with_color(out: &mut std::io::Stdout, s: &str, col: Color) -> crosst
     use std::io::Write;
 
     match col {
-        Color::Cyan => write!(out, "{}", Colorize::cyan("██"))?,
-        Color::Blue => write!(out, "{}", Colorize::blue("██"))?,
-        Color::Orange => write!(out, "{}", Colorize::truecolor("██", 0xFF, 0xA5, 0x00))?,
-        Color::Yellow => write!(out, "{}", Colorize::yellow("██"))?,
-        Color::Green => write!(out, "{}", Colorize::green("██"))?,
-        Color::Purple => write!(out, "{}", Colorize::purple("██"))?,
-        Color::Red => write!(out, "{}", Colorize::red("██"))?,
+        Color::Cyan => write!(out, "{}", Colorize::cyan("██")),
+        Color::Blue => write!(out, "{}", Colorize::blue("██")),
+        Color::Orange => write!(out, "{}", Colorize::truecolor("██", 0xFF, 0xA5, 0x00)),
+        Color::Yellow => write!(out, "{}", Colorize::yellow("██")),
+        Color::Green => write!(out, "{}", Colorize::green("██")),
+        Color::Purple => write!(out, "{}", Colorize::purple("██")),
+        Color::Red => write!(out, "{}", Colorize::red("██")),
     }
-    Ok(())
 }
