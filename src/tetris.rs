@@ -1,7 +1,8 @@
 use crate::game::{Game, UpdateEvent};
+use colored::Colorize;
 use crossterm::style::Stylize;
 use rand::Rng;
-use std::time::Duration;
+use std::{io, time::Duration};
 use strum::EnumCount;
 use strum_macros::{EnumCount, FromRepr};
 
@@ -20,6 +21,17 @@ enum UserInput {
     None,
 }
 
+#[derive(Clone, Copy)]
+pub enum Color {
+    Cyan,
+    Blue,
+    Orange,
+    Yellow,
+    Green,
+    Purple,
+    Red,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Point {
     pub x: f32,
@@ -28,12 +40,11 @@ pub struct Point {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Figure {
-    pub relative_points: [Point; 4],
-    pub pivot: Point,
+    pub figure_type: FigureType,
     pub rotation: f32, // in radians
 }
 
-#[derive(FromRepr, EnumCount)]
+#[derive(Clone, Copy, FromRepr, EnumCount, Debug, PartialEq)]
 pub enum FigureType {
     Square,
     Line,
@@ -44,98 +55,113 @@ pub enum FigureType {
     T,
 }
 
-impl Figure {
-    pub fn new(figure_type: FigureType, rotation: f32) -> Self {
-        match figure_type {
-            FigureType::Square => Self {
-                relative_points: [
+impl FigureType {
+    pub fn get_color(&self) -> Color {
+        match self {
+            FigureType::Square => Color::Yellow,
+            FigureType::Line => Color::Cyan,
+            FigureType::L => Color::Orange,
+            FigureType::LMirrored => Color::Blue,
+            FigureType::Z => Color::Red,
+            FigureType::ZMirrored => Color::Green,
+            FigureType::T => Color::Purple,
+        }
+    }
+
+    pub fn get_points_and_pivot<'a>(&'a self) -> &'static ([Point; 4], Point) {
+        match self {
+            FigureType::Square => &(
+                [
                     Point { x: 0.0, y: 0.0 },
                     Point { x: 1.0, y: 0.0 },
                     Point { x: 0.0, y: 1.0 },
                     Point { x: 1.0, y: 1.0 },
                 ],
-                pivot: Point { x: 0.5, y: 0.5 },
-                rotation,
-            },
-            FigureType::Line => Self {
-                relative_points: [
+                Point { x: 0.5, y: 0.5 },
+            ),
+            FigureType::Line => &(
+                [
                     Point { x: 0.0, y: 0.0 },
                     Point { x: 1.0, y: 0.0 },
                     Point { x: 2.0, y: 0.0 },
                     Point { x: 3.0, y: 0.0 },
                 ],
-                pivot: Point { x: 1.5, y: 0.5 },
-                rotation,
-            },
-            FigureType::L => Self {
-                relative_points: [
+                Point { x: 1.5, y: 0.5 },
+            ),
+            FigureType::L => &(
+                [
                     Point { x: 0.0, y: 0.0 },
                     Point { x: 0.0, y: 1.0 },
                     Point { x: 1.0, y: 1.0 },
                     Point { x: 2.0, y: 1.0 },
                 ],
-                pivot: Point { x: 1.0, y: 1.0 },
-                rotation,
-            },
-            FigureType::LMirrored => Self {
-                relative_points: [
+                Point { x: 1.0, y: 1.0 },
+            ),
+            FigureType::LMirrored => &(
+                [
                     Point { x: 0.0, y: 1.0 },
                     Point { x: 1.0, y: 1.0 },
                     Point { x: 2.0, y: 1.0 },
                     Point { x: 2.0, y: 0.0 },
                 ],
-                pivot: Point { x: 1.0, y: 1.0 },
-                rotation,
-            },
-            FigureType::Z => Self {
-                relative_points: [
+                Point { x: 1.0, y: 1.0 },
+            ),
+            FigureType::Z => &(
+                [
                     Point { x: 0.0, y: 0.0 },
                     Point { x: 1.0, y: 0.0 },
                     Point { x: 1.0, y: 1.0 },
                     Point { x: 2.0, y: 1.0 },
                 ],
-                pivot: Point { x: 1.0, y: 0.0 },
-                rotation,
-            },
-            FigureType::ZMirrored => Self {
-                relative_points: [
+                Point { x: 1.0, y: 0.0 },
+            ),
+            FigureType::ZMirrored => &(
+                [
                     Point { x: 0.0, y: 1.0 },
                     Point { x: 1.0, y: 1.0 },
                     Point { x: 1.0, y: 0.0 },
                     Point { x: 2.0, y: 0.0 },
                 ],
-                pivot: Point { x: 1.0, y: 0.0 },
-                rotation,
-            },
-            FigureType::T => Self {
-                relative_points: [
+                Point { x: 1.0, y: 0.0 },
+            ),
+            FigureType::T => &(
+                [
                     Point { x: 0.0, y: 0.0 },
                     Point { x: 1.0, y: 0.0 },
                     Point { x: 2.0, y: 0.0 },
                     Point { x: 1.0, y: 1.0 },
                 ],
-                pivot: Point { x: 1.0, y: 0.0 },
-                rotation,
-            },
+                Point { x: 1.0, y: 0.0 },
+            ),
+        }
+    }
+}
+
+impl Figure {
+    pub fn new(figure_type: FigureType, rotation: f32) -> Self {
+        Self {
+            figure_type,
+            rotation,
         }
     }
 
     pub fn applied_rotation_and_position(&self, rotation: f32, position: Point) -> [Point; 4] {
-        let mut points = self.relative_points;
+        let (points, pivot) = self.figure_type.get_points_and_pivot();
+        let mut points = points.clone();
         for point in points.iter_mut() {
-            let x = point.x - self.pivot.x;
-            let y = point.y - self.pivot.y;
+            let x = point.x - pivot.x;
+            let y = point.y - pivot.y;
             let x_new = x * rotation.cos() - y * rotation.sin();
             let y_new = x * rotation.sin() + y * rotation.cos();
-            point.x = x_new + self.pivot.x + position.x;
-            point.y = y_new + self.pivot.y + position.y;
+            point.x = x_new + pivot.x + position.x;
+            point.y = y_new + pivot.y + position.y;
         }
         points
     }
 }
 
 pub struct TetrisGame {
-    pub board: [[bool; WIDTH]; HEIGHT],
+    pub board: [[Option<Color>; WIDTH]; HEIGHT],
     pub current_figure: Figure,
     pub current_figure_position: Point,
     pub next_figure: Figure,
@@ -151,7 +177,7 @@ pub struct TetrisGame {
 impl TetrisGame {
     pub fn new() -> Self {
         Self {
-            board: [[false; WIDTH]; HEIGHT],
+            board: [[None; WIDTH]; HEIGHT],
             current_figure: Self::gen_figure(),
             current_figure_position: INIT_FIGURE_POS,
             next_figure: Self::gen_figure(),
@@ -174,7 +200,7 @@ impl TetrisGame {
     }
 
     fn is_line_ready(&self, row_num: usize) -> bool {
-        self.board[row_num].iter().all(|&c| c)
+        self.board[row_num].iter().all(|&c| c.is_some())
     }
 }
 
@@ -196,7 +222,7 @@ impl Game for TetrisGame {
                     self.current_figure_position,
                 )
                 .iter()
-                .any(|p| self.board[p.y.round() as usize][p.x.round() as usize])
+                .any(|p| self.board[p.y.round() as usize][p.x.round() as usize].is_some())
             {
                 return UpdateEvent::GameOver;
             }
@@ -257,7 +283,7 @@ impl Game for TetrisGame {
                 if point.x.round() < 0.0
                     || point.x.round() >= WIDTH as f32
                     || point.y.round() >= HEIGHT as f32
-                    || self.board[point.y.round() as usize][point.x.round() as usize]
+                    || self.board[point.y.round() as usize][point.x.round() as usize].is_some()
                 {
                     can_move = false;
                 }
@@ -281,7 +307,7 @@ impl Game for TetrisGame {
             .iter()
             .any(|p| {
                 p.y.round() as usize >= HEIGHT - 1
-                    || self.board[p.y.round() as usize + 1][p.x.round() as usize]
+                    || self.board[p.y.round() as usize + 1][p.x.round() as usize].is_some()
             }) {
             for p in self
                 .current_figure
@@ -291,7 +317,8 @@ impl Game for TetrisGame {
                 )
                 .iter()
             {
-                self.board[p.y.round() as usize][p.x.round() as usize] = true
+                self.board[p.y.round() as usize][p.x.round() as usize] =
+                    Some(self.current_figure.figure_type.get_color())
             }
 
             self.current_figure = self.next_figure;
@@ -386,10 +413,9 @@ impl Game for TetrisGame {
                     execute!(out, MoveTo(0, y as u16))?;
                     write!(out, " ║")?;
                     for &cell in row.iter() {
-                        if cell {
-                            write!(out, "██")?;
-                        } else {
-                            write!(out, "  ")?;
+                        match cell {
+                            None => write!(out, "  ")?,
+                            Some(col) => draw_with_color(out, "██", col)?,
                         }
                     }
                     write!(out, "║ ")?;
@@ -423,7 +449,7 @@ impl Game for TetrisGame {
                         point.y.round() as u16
                     )
                 )?;
-                write!(out, "██")?;
+                draw_with_color(out, "██", self.current_figure.figure_type.get_color())?;
             }
         }
 
@@ -471,4 +497,19 @@ impl Game for TetrisGame {
     fn get_score(&self) -> usize {
         self.score
     }
+}
+
+pub fn draw_with_color(out: &mut std::io::Stdout, s: &str, col: Color) -> crossterm::Result<()> {
+    use std::io::Write;
+
+    match col {
+        Color::Cyan => write!(out, "{}", Colorize::cyan("██"))?,
+        Color::Blue => write!(out, "{}", Colorize::blue("██"))?,
+        Color::Orange => write!(out, "{}", Colorize::truecolor("██", 0xFF, 0xA5, 0x00))?,
+        Color::Yellow => write!(out, "{}", Colorize::yellow("██"))?,
+        Color::Green => write!(out, "{}", Colorize::green("██"))?,
+        Color::Purple => write!(out, "{}", Colorize::purple("██"))?,
+        Color::Red => write!(out, "{}", Colorize::red("██"))?,
+    }
+    Ok(())
 }
