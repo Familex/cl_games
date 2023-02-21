@@ -13,18 +13,19 @@ const TO_DESCEND_FAST: Duration = Duration::from_millis(50);
 const MINIMUM_USER_INPUT_DISTANCE: Duration = Duration::from_millis(125);
 const INIT_FIGURE_POS: Point = Point { x: 3.0, y: 0.0 };
 const LOSE_LINE: f32 = 1.0;
-const NEXT_FIGURE_FRAME_FROM_BOARD_INDENT: usize = 2;
 const BORDER_WIDTH: usize = 2; // in symbols!
 const BORDER_HEIGHT: usize = 1;
 
-// #### to namespace
-const NEXT_FIGURE_FRAME_INDENT: usize =
-    BORDER_WIDTH * 2 + WIDTH * 2 + NEXT_FIGURE_FRAME_FROM_BOARD_INDENT;
-//                           ^^^ cells have 2-symbols width
-const NEXT_FIGURE_FRAME_WIDTH: usize = 5;
-const NEXT_FIGURE_FRAME_HEIGHT: usize = 5;
-const NEXT_FIGURE_FRAME_INDENT_UP: usize = 2;
-// #### to namespace
+mod next_fig_frame {
+    use super::*;
+
+    pub const FROM_BOARD_INDENT: usize = 2;
+    pub const INDENT: usize = BORDER_WIDTH * 2 + WIDTH * 2 + FROM_BOARD_INDENT;
+    //                           ^^^ cells have 2-symbols width
+    pub const WIDTH: usize = 5;
+    pub const HEIGHT: usize = 5;
+    pub const INDENT_UP: usize = 2;
+}
 
 enum UserInput {
     Left,
@@ -508,8 +509,8 @@ impl Game for TetrisGame {
                 execute!(
                     out,
                     MoveTo(
-                        NEXT_FIGURE_FRAME_INDENT as u16 + 1,
-                        NEXT_FIGURE_FRAME_INDENT_UP as u16 - 1
+                        next_fig_frame::INDENT as u16 + 1,
+                        next_fig_frame::INDENT_UP as u16 - 1
                     )
                 )?;
                 write!(out, "Next figure:")?;
@@ -521,12 +522,12 @@ impl Game for TetrisGame {
                     execute!(
                         out,
                         MoveTo(
-                            NEXT_FIGURE_FRAME_INDENT as u16,
-                            NEXT_FIGURE_FRAME_INDENT_UP as u16
+                            next_fig_frame::INDENT as u16,
+                            next_fig_frame::INDENT_UP as u16
                         )
                     )?;
                     write!(out, " ╔")?;
-                    for _ in 0..NEXT_FIGURE_FRAME_WIDTH {
+                    for _ in 0..next_fig_frame::WIDTH {
                         write!(out, "══")?;
                     }
                     write!(out, "╗ ")?;
@@ -534,23 +535,21 @@ impl Game for TetrisGame {
 
                 // Left and right
                 {
-                    for row in 0..NEXT_FIGURE_FRAME_HEIGHT {
+                    for row in 0..next_fig_frame::HEIGHT {
                         execute!(
                             out,
                             MoveTo(
-                                NEXT_FIGURE_FRAME_INDENT as u16,
-                                (NEXT_FIGURE_FRAME_INDENT_UP + BORDER_HEIGHT + row) as u16
+                                next_fig_frame::INDENT as u16,
+                                (next_fig_frame::INDENT_UP + BORDER_HEIGHT + row) as u16
                             )
                         )?;
                         write!(out, " ║")?;
                         execute!(
                             out,
                             MoveTo(
-                                (NEXT_FIGURE_FRAME_INDENT
-                                    + BORDER_WIDTH
-                                    + NEXT_FIGURE_FRAME_WIDTH * 2)
+                                (next_fig_frame::INDENT + BORDER_WIDTH + next_fig_frame::WIDTH * 2)
                                     as u16,
-                                (NEXT_FIGURE_FRAME_INDENT_UP + BORDER_HEIGHT + row) as u16
+                                (next_fig_frame::INDENT_UP + BORDER_HEIGHT + row) as u16
                             )
                         )?;
                         write!(out, "║ ")?;
@@ -562,12 +561,12 @@ impl Game for TetrisGame {
                     execute!(
                         out,
                         MoveTo(
-                            NEXT_FIGURE_FRAME_INDENT as u16,
-                            (NEXT_FIGURE_FRAME_INDENT_UP + NEXT_FIGURE_FRAME_HEIGHT) as u16
+                            next_fig_frame::INDENT as u16,
+                            (next_fig_frame::INDENT_UP + next_fig_frame::HEIGHT) as u16
                         )
                     )?;
                     write!(out, " ╚")?;
-                    for _ in 0..NEXT_FIGURE_FRAME_WIDTH {
+                    for _ in 0..next_fig_frame::WIDTH {
                         write!(out, "══")?;
                     }
                     write!(out, "╝ ")?;
@@ -578,10 +577,10 @@ impl Game for TetrisGame {
                 for point in self.next_figure.applied_rotation_and_position(
                     std::f32::consts::PI / 2.0,
                     Point {
-                        x: (NEXT_FIGURE_FRAME_INDENT + BORDER_WIDTH + NEXT_FIGURE_FRAME_WIDTH / 2)
+                        x: (next_fig_frame::INDENT + BORDER_WIDTH + next_fig_frame::WIDTH / 2)
                             as f32
                             / 2.0,
-                        y: (NEXT_FIGURE_FRAME_INDENT_UP + NEXT_FIGURE_FRAME_HEIGHT / 2) as f32,
+                        y: (next_fig_frame::INDENT_UP + next_fig_frame::HEIGHT / 2) as f32,
                     },
                 ) {
                     execute!(
