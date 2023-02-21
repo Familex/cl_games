@@ -17,11 +17,9 @@ const BORDER_WIDTH: usize = 2; // in symbols!
 const BORDER_HEIGHT: usize = 1;
 
 mod next_fig_frame {
-    use super::*;
-
     pub const FROM_BOARD_INDENT: usize = 2;
-    pub const INDENT: usize = BORDER_WIDTH * 2 + WIDTH * 2 + FROM_BOARD_INDENT;
-    //                           ^^^ cells have 2-symbols width
+    pub const INDENT: usize = super::BORDER_WIDTH * 2 + super::WIDTH * 2 + FROM_BOARD_INDENT;
+    //                                                               ^^^ cells have 2-symbols width
     pub const WIDTH: usize = 5;
     pub const HEIGHT: usize = 5;
     pub const INDENT_UP: usize = 2;
