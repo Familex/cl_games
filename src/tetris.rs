@@ -2,7 +2,7 @@ use crate::game::{Game, UpdateEvent};
 use colored::Colorize;
 use crossterm::style::Stylize;
 use rand::Rng;
-use std::{io, time::Duration};
+use std::time::Duration;
 use strum::EnumCount;
 use strum_macros::{EnumCount, FromRepr};
 
@@ -602,12 +602,12 @@ pub fn draw_with_color(out: &mut std::io::Stdout, s: &str, col: Color) -> crosst
     use std::io::Write;
 
     match col {
-        Color::Cyan => write!(out, "{}", Colorize::cyan("██")),
-        Color::Blue => write!(out, "{}", Colorize::blue("██")),
-        Color::Orange => write!(out, "{}", Colorize::truecolor("██", 0xFF, 0xA5, 0x00)),
-        Color::Yellow => write!(out, "{}", Colorize::yellow("██")),
-        Color::Green => write!(out, "{}", Colorize::green("██")),
-        Color::Purple => write!(out, "{}", Colorize::purple("██")),
-        Color::Red => write!(out, "{}", Colorize::red("██")),
+        Color::Cyan => write!(out, "{}", Colorize::cyan(s)),
+        Color::Blue => write!(out, "{}", Colorize::blue(s)),
+        Color::Orange => write!(out, "{}", Colorize::truecolor(s, 0xFF, 0xA5, 0x00)),
+        Color::Yellow => write!(out, "{}", Colorize::yellow(s)),
+        Color::Green => write!(out, "{}", Colorize::green(s)),
+        Color::Purple => write!(out, "{}", Colorize::purple(s)),
+        Color::Red => write!(out, "{}", Colorize::red(s)),
     }
 }

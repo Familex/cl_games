@@ -1,5 +1,3 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
 extern crate static_assertions as sa;
 pub mod game;
 pub mod snake;
@@ -9,20 +7,6 @@ enum MenuChoice {
     Exit = 0,
     SnakeGame = 1,
     TetrisGame = 2,
-}
-
-fn main_() {
-    use tetris::{Figure, FigureType, Point};
-
-    let line = Figure::new(FigureType::Line, 0.0);
-    println!(
-        "{:?}",
-        line.applied_rotation_and_position(line.rotation, Point { x: 0.0, y: 0.0 })
-    );
-    println!(
-        "{:?}",
-        line.applied_rotation_and_position(std::f32::consts::PI / 2.0, Point { x: 0.0, y: 0.0 })
-    );
 }
 
 fn main() -> crossterm::Result<()> {
