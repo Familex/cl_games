@@ -1,12 +1,17 @@
 extern crate static_assertions as sa;
 pub mod game;
 pub mod snake;
+pub mod space_invaders;
 pub mod tetris;
 
 enum MenuChoice {
     Exit = 0,
     SnakeGame = 1,
     TetrisGame = 2,
+    SpaceInvadersGame = 3,
+
+    #[allow(dead_code)]
+    LastElement, // for static check
 }
 
 fn main() -> crossterm::Result<()> {
@@ -20,7 +25,7 @@ fn main() -> crossterm::Result<()> {
 
     'main_loop: loop {
         // Create all games on stack
-        let (mut snake, mut tetris);
+        let (mut snake, mut tetris, mut space_invaders);
 
         // Make game from player choice
         let game: &mut dyn Game = match {
@@ -31,6 +36,10 @@ fn main() -> crossterm::Result<()> {
                 println!("   {}. Exit", MenuChoice::Exit as usize);
                 println!("   {}. Snake", MenuChoice::SnakeGame as usize);
                 println!("   {}. Tetris", MenuChoice::TetrisGame as usize);
+                println!(
+                    "   {}. Space invaders",
+                    MenuChoice::SpaceInvadersGame as usize
+                );
 
                 choice = read_game_choice();
 
@@ -48,8 +57,19 @@ fn main() -> crossterm::Result<()> {
                 tetris = tetris::TetrisGame::new();
                 &mut tetris
             }
+            Some(MenuChoice::SpaceInvadersGame) => {
+                let (w, h) = crossterm::terminal::size().expect("Failed to get terminal size");
 
+                space_invaders = space_invaders::SpaceInvadersGame::new(
+                    h,
+                    w,
+                    space_invaders::EnemyPreset::CheckeredLeftRight,
+                    space_invaders::PropsPreset::Empty,
+                );
+                &mut space_invaders
+            }
             Some(MenuChoice::Exit) => break 'main_loop,
+            Some(MenuChoice::LastElement) => unreachable!(),
             None => unreachable!(),
         };
 
@@ -146,11 +166,15 @@ fn read_game_choice() -> Option<MenuChoice> {
     sa::const_assert!(MenuChoice::Exit as usize == 0);
     sa::const_assert!(MenuChoice::SnakeGame as usize == 1);
     sa::const_assert!(MenuChoice::TetrisGame as usize == 2);
+    sa::const_assert!(MenuChoice::SpaceInvadersGame as usize == 3);
+
+    sa::const_assert!(MenuChoice::LastElement as usize == 4);
 
     match choice {
         0 => Some(MenuChoice::Exit),
         1 => Some(MenuChoice::SnakeGame),
         2 => Some(MenuChoice::TetrisGame),
+        3 => Some(MenuChoice::SpaceInvadersGame),
         _ => None,
     }
 }
