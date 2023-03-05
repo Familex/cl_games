@@ -1,8 +1,16 @@
 use crate::game::{Game, UpdateEvent};
+use rand::Rng;
 use std::time::Duration;
 
 const FOR_ENEMY_SCORE: usize = 1;
 const FOR_PROP_SCORE: usize = 1;
+const FIRE_BULLET_OFFSET: f32 = 1.0;
+
+pub fn is_success(chance: f32) -> bool {
+    let mut rng = rand::thread_rng();
+    let random: f32 = rng.gen();
+    random < chance / 100.0
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Point {
@@ -10,7 +18,7 @@ pub struct Point {
     y: f32,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug)]
 pub enum Direction {
     Up,
     Down,
@@ -25,23 +33,31 @@ pub struct Bullet {
     speed: f32,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum EnemyBehaviorType {
-    LeftRight(Duration),
+    Move(Direction, f32),
+    Fire(Direction, f32),
+    Wait,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
+pub struct EnemyBehaviorAction {
+    action_type: EnemyBehaviorType,
+    duration: Duration,
+    chance: f32,
+}
+
+#[derive(Clone, Debug)]
 pub struct EnemyBehavior {
-    behavior_type: EnemyBehaviorType,
-    speed: f32,
-    from_last_move: Duration,
-    last_move_direction: Direction,
+    behavior_line: Vec<EnemyBehaviorAction>,
+    to_next_move: Duration,
+    current_action: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Enemy {
     position: Point,
-    behavior: EnemyBehavior,
+    behaviour: EnemyBehavior,
 }
 
 #[derive(Clone)]
@@ -65,6 +81,7 @@ pub struct SpaceInvadersGame {
 pub enum EnemyPreset {
     Empty,
     CheckeredLeftRight,
+    CheckeredRightDownLeftUp,
 }
 
 pub enum PropsPreset {
@@ -92,13 +109,79 @@ impl SpaceInvadersGame {
                                     x: x as f32 * 2.0 + y as f32 % 2.0,
                                     y: y as f32,
                                 },
-                                behavior: EnemyBehavior {
-                                    behavior_type: EnemyBehaviorType::LeftRight(
-                                        Duration::from_secs(1),
-                                    ),
-                                    speed: 1.0,
-                                    from_last_move: Duration::from_secs(0),
-                                    last_move_direction: Direction::Left,
+                                behaviour: EnemyBehavior {
+                                    behavior_line: vec![
+                                        EnemyBehaviorAction {
+                                            action_type: EnemyBehaviorType::Move(
+                                                Direction::Right,
+                                                1.0,
+                                            ),
+                                            duration: Duration::from_millis(1000),
+                                            chance: 100.0,
+                                        },
+                                        EnemyBehaviorAction {
+                                            action_type: EnemyBehaviorType::Move(
+                                                Direction::Left,
+                                                1.0,
+                                            ),
+                                            duration: Duration::from_millis(1000),
+                                            chance: 100.0,
+                                        },
+                                    ],
+                                    to_next_move: Duration::from_millis(0),
+                                    current_action: 0,
+                                },
+                            });
+                        }
+                    }
+                    enemies
+                }
+                EnemyPreset::CheckeredRightDownLeftUp => {
+                    let mut enemies = vec![];
+                    for y in 0..5 {
+                        for x in 0..screen_width / 2 / 2 {
+                            enemies.push(Enemy {
+                                position: Point {
+                                    x: x as f32 * 2.0 + y as f32 % 2.0,
+                                    y: y as f32,
+                                },
+                                behaviour: EnemyBehavior {
+                                    behavior_line: vec![
+                                        EnemyBehaviorAction {
+                                            action_type: EnemyBehaviorType::Move(
+                                                Direction::Right,
+                                                1.0,
+                                            ),
+                                            duration: Duration::from_millis(1000),
+                                            chance: 100.0,
+                                        },
+                                        EnemyBehaviorAction {
+                                            action_type: EnemyBehaviorType::Move(
+                                                Direction::Down,
+                                                1.0,
+                                            ),
+                                            duration: Duration::from_millis(1000),
+                                            chance: 100.0,
+                                        },
+                                        EnemyBehaviorAction {
+                                            action_type: EnemyBehaviorType::Move(
+                                                Direction::Left,
+                                                1.0,
+                                            ),
+                                            duration: Duration::from_millis(1000),
+                                            chance: 100.0,
+                                        },
+                                        EnemyBehaviorAction {
+                                            action_type: EnemyBehaviorType::Move(
+                                                Direction::Up,
+                                                1.0,
+                                            ),
+                                            duration: Duration::from_millis(1000),
+                                            chance: 100.0,
+                                        },
+                                    ],
+                                    to_next_move: Duration::from_millis(0),
+                                    current_action: 0,
                                 },
                             });
                         }
@@ -137,6 +220,15 @@ impl Game for SpaceInvadersGame {
         input: &Option<crossterm::event::KeyEvent>,
         delta_time: &Duration,
     ) -> UpdateEvent {
+        // quit request
+        let quit_requested = match input {
+            Some(crossterm::event::KeyEvent {
+                code: crossterm::event::KeyCode::Char('q'),
+                ..
+            }) => true,
+            _ => false,
+        };
+
         // player movement
         // modifies self.player
         {
@@ -183,44 +275,77 @@ impl Game for SpaceInvadersGame {
 
         // enemies movement
         // modifies self.enemies
+        // FIXME deobfuscate self variables access (cause of borrow checker)
         {
-            let enemies = &mut self.enemies;
-            for enemy in enemies {
-                let enemy_position = &mut enemy.position;
-                let enemy_behavior = &mut enemy.behavior;
-                let enemy_speed = enemy_behavior.speed;
-                match enemy_behavior.behavior_type {
-                    EnemyBehaviorType::LeftRight(duration) => {
-                        if enemy_behavior.from_last_move >= duration {
-                            enemy_behavior.from_last_move = Duration::from_secs(0);
-                            let next_position = match enemy_behavior.last_move_direction {
-                                Direction::Left => {
-                                    enemy_behavior.last_move_direction = Direction::Right;
-                                    Some(Point {
-                                        x: enemy_position.x + enemy_speed,
-                                        y: enemy_position.y,
-                                    })
-                                }
-                                Direction::Right => {
-                                    enemy_behavior.last_move_direction = Direction::Left;
-                                    Some(Point {
-                                        x: enemy_position.x - enemy_speed,
-                                        y: enemy_position.y,
-                                    })
-                                }
-                                _ => None,
-                            };
-                            if let Some(next_position) = next_position {
+            for enemy_ind in 0..self.enemies.len() {
+                let action = self.enemies[enemy_ind].behaviour.behavior_line
+                    [self.enemies[enemy_ind].behaviour.current_action]
+                    .clone();
+                while self.enemies[enemy_ind].behaviour.to_next_move.as_nanos() == 0 {
+                    if is_success(action.chance) {
+                        if match &action.action_type {
+                            EnemyBehaviorType::Move(direction, speed) => {
+                                let next_position = {
+                                    //let enemy = &self.enemies[enemy_ind];
+                                    match direction {
+                                        Direction::Up => Point {
+                                            x: self.enemies[enemy_ind].position.x,
+                                            y: self.enemies[enemy_ind].position.y - speed,
+                                        },
+                                        Direction::Down => Point {
+                                            x: self.enemies[enemy_ind].position.x,
+                                            y: self.enemies[enemy_ind].position.y + speed,
+                                        },
+                                        Direction::Left => Point {
+                                            x: self.enemies[enemy_ind].position.x - speed,
+                                            y: self.enemies[enemy_ind].position.y,
+                                        },
+                                        Direction::Right => Point {
+                                            x: self.enemies[enemy_ind].position.x + speed,
+                                            y: self.enemies[enemy_ind].position.y,
+                                        },
+                                    }
+                                };
                                 if bounds_check(&next_position)
+                                    && self.enemies.iter().enumerate().all(|(other_ind, other)| {
+                                        other_ind == enemy_ind || other.position != next_position
+                                    })
                                     && self.props.iter().all(|prop| prop.position != next_position)
                                 {
-                                    *enemy_position = next_position;
+                                    self.enemies[enemy_ind].position = next_position.clone();
+                                    true
+                                } else {
+                                    false
                                 }
                             }
-                        } else {
-                            enemy_behavior.from_last_move += *delta_time;
+                            EnemyBehaviorType::Fire(direction, speed) => {
+                                self.bullets.push(Bullet {
+                                    move_direction: *direction,
+                                    position: Point {
+                                        x: self.enemies[enemy_ind].position.x,
+                                        y: self.enemies[enemy_ind].position.y + FIRE_BULLET_OFFSET,
+                                    },
+                                    speed: *speed,
+                                });
+                                true
+                            }
+                            EnemyBehaviorType::Wait => true,
+                        } {
+                            let duration = action.duration;
+                            self.enemies[enemy_ind].behaviour.to_next_move += duration;
                         }
                     }
+                    self.enemies[enemy_ind].behaviour.current_action += 1;
+                    if self.enemies[enemy_ind].behaviour.current_action
+                        >= self.enemies[enemy_ind].behaviour.behavior_line.len()
+                    {
+                        self.enemies[enemy_ind].behaviour.current_action = 0;
+                    }
+                }
+                if self.enemies[enemy_ind].behaviour.to_next_move < *delta_time {
+                    self.enemies[enemy_ind].behaviour.to_next_move = Duration::from_nanos(0);
+                } else {
+                    self.enemies[enemy_ind].behaviour.to_next_move -= *delta_time;
                 }
             }
         }
@@ -323,7 +448,7 @@ impl Game for SpaceInvadersGame {
             });
         }
 
-        if is_player_collided {
+        if is_player_collided || quit_requested {
             UpdateEvent::GameOver
         } else {
             UpdateEvent::GameContinue
