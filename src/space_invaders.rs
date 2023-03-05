@@ -76,6 +76,26 @@ impl EnemyBehavior {
             current_action,
         }
     }
+
+    fn current_action(&self) -> EnemyAction {
+        self.actions[self.current_action].clone()
+    }
+
+    fn to_next_action(&mut self) {
+        self.current_action += 1;
+        if self.current_action >= self.actions.len() {
+            self.current_action = 0;
+        }
+    }
+
+    /// FIXME rename
+    fn delta(&mut self, delta_time: Duration) {
+        if self.to_next_move < delta_time {
+            self.to_next_move = Duration::from_nanos(0);
+        } else {
+            self.to_next_move -= delta_time;
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -106,6 +126,7 @@ pub enum EnemyPreset {
     Empty,
     CheckeredLeftRight,
     CheckeredRightDownLeftUp,
+    CheckeredLeft,
 }
 
 pub enum PropsPreset {
@@ -186,6 +207,29 @@ impl SpaceInvadersGame {
                                             100.0,
                                         ),
                                     ],
+                                    Duration::from_millis(0),
+                                    0,
+                                ),
+                            });
+                        }
+                    }
+                    enemies
+                }
+                EnemyPreset::CheckeredLeft => {
+                    let mut enemies = vec![];
+                    for y in 0..5 {
+                        for x in 0..screen_width / 2 / 2 {
+                            enemies.push(Enemy {
+                                position: Point {
+                                    x: x as f32 * 2.0 + y as f32 % 2.0,
+                                    y: y as f32,
+                                },
+                                behavior: EnemyBehavior::new(
+                                    vec![EnemyAction::new(
+                                        EnemyActionType::Move(Direction::Left, 1.0),
+                                        Duration::from_millis(1000),
+                                        100.0,
+                                    )],
                                     Duration::from_millis(0),
                                     0,
                                 ),
@@ -284,31 +328,30 @@ impl Game for SpaceInvadersGame {
         // FIXME deobfuscate self variables access (cause of borrow checker)
         {
             for enemy_ind in 0..self.enemies.len() {
-                let action = self.enemies[enemy_ind].behavior.actions
-                    [self.enemies[enemy_ind].behavior.current_action]
-                    .clone();
-                while self.enemies[enemy_ind].behavior.to_next_move.as_nanos() == 0 {
+                let enemy_position = self.enemies[enemy_ind].position.clone();
+                let behavior = std::cell::RefCell::new(&mut self.enemies[enemy_ind].behavior);
+                let action = behavior.borrow().current_action();
+                if self.enemies[enemy_ind].behavior.to_next_move.as_nanos() == 0 {
                     if is_success(action.chance) {
                         if match &action.action_type {
                             EnemyActionType::Move(direction, speed) => {
                                 let next_position = {
-                                    //let enemy = &self.enemies[enemy_ind];
                                     match direction {
                                         Direction::Up => Point {
-                                            x: self.enemies[enemy_ind].position.x,
-                                            y: self.enemies[enemy_ind].position.y - speed,
+                                            x: enemy_position.x,
+                                            y: enemy_position.y - speed,
                                         },
                                         Direction::Down => Point {
-                                            x: self.enemies[enemy_ind].position.x,
-                                            y: self.enemies[enemy_ind].position.y + speed,
+                                            x: enemy_position.x,
+                                            y: enemy_position.y + speed,
                                         },
                                         Direction::Left => Point {
-                                            x: self.enemies[enemy_ind].position.x - speed,
-                                            y: self.enemies[enemy_ind].position.y,
+                                            x: enemy_position.x - speed,
+                                            y: enemy_position.y,
                                         },
                                         Direction::Right => Point {
-                                            x: self.enemies[enemy_ind].position.x + speed,
-                                            y: self.enemies[enemy_ind].position.y,
+                                            x: enemy_position.x + speed,
+                                            y: enemy_position.y,
                                         },
                                     }
                                 };
@@ -318,7 +361,7 @@ impl Game for SpaceInvadersGame {
                                     })
                                     && self.props.iter().all(|prop| prop.position != next_position)
                                 {
-                                    self.enemies[enemy_ind].position = next_position.clone();
+                                    self.enemies[enemy_ind].position = next_position;
                                     true
                                 } else {
                                     false
@@ -328,8 +371,8 @@ impl Game for SpaceInvadersGame {
                                 self.bullets.push(Bullet {
                                     move_direction: *direction,
                                     position: Point {
-                                        x: self.enemies[enemy_ind].position.x,
-                                        y: self.enemies[enemy_ind].position.y + FIRE_BULLET_OFFSET,
+                                        x: enemy_position.x,
+                                        y: enemy_position.y + FIRE_BULLET_OFFSET,
                                     },
                                     speed: *speed,
                                 });
@@ -337,22 +380,12 @@ impl Game for SpaceInvadersGame {
                             }
                             EnemyActionType::Wait => true,
                         } {
-                            let duration = action.duration;
-                            self.enemies[enemy_ind].behavior.to_next_move += duration;
+                            self.enemies[enemy_ind].behavior.to_next_move += action.duration;
                         }
                     }
-                    self.enemies[enemy_ind].behavior.current_action += 1;
-                    if self.enemies[enemy_ind].behavior.current_action
-                        >= self.enemies[enemy_ind].behavior.actions.len()
-                    {
-                        self.enemies[enemy_ind].behavior.current_action = 0;
-                    }
+                    self.enemies[enemy_ind].behavior.to_next_action()
                 }
-                if self.enemies[enemy_ind].behavior.to_next_move < *delta_time {
-                    self.enemies[enemy_ind].behavior.to_next_move = Duration::from_nanos(0);
-                } else {
-                    self.enemies[enemy_ind].behavior.to_next_move -= *delta_time;
-                }
+                self.enemies[enemy_ind].behavior.delta(*delta_time);
             }
         }
 
