@@ -12,10 +12,16 @@ pub fn is_success(chance: f32) -> bool {
     random < chance / 100.0
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Point {
     x: f32,
     y: f32,
+}
+
+impl PartialEq for Point {
+    fn eq(&self, other: &Self) -> bool {
+        self.x.round() == other.x.round() && self.y.round() == other.y.round()
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -26,7 +32,7 @@ pub enum Direction {
     Right,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Bullet {
     move_direction: Direction,
     position: Point,
@@ -237,7 +243,7 @@ impl SpaceInvadersGame {
             },
             player: Player {
                 position: Point {
-                    x: screen_width as f32 / 2.0 / 2.0,
+                    x: (screen_width as f32 / 2.0 / 2.0).round(),
                     y: screen_height as f32 - 1.0,
                 },
             },
@@ -399,7 +405,6 @@ impl Game for SpaceInvadersGame {
 
         // bullets movement
         // modifies bullets
-        // FIXME not work on a certain terminal scale
         {
             for bullet in &mut self.bullets {
                 let bullet_position = &mut bullet.position;
