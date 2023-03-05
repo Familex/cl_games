@@ -55,7 +55,7 @@ pub struct EnemyAction {
 
 impl EnemyAction {
     pub fn new(action_type: EnemyActionType, duration: Duration, chance: f32) -> Self {
-        assert!(chance >= 0.0 && chance <= 100.0);
+        assert!((0.0..=100.0).contains(&chance));
 
         Self {
             action_type,
@@ -111,7 +111,7 @@ impl EnemyBehavior {
         self.actions[self.current_action].clone()
     }
 
-    fn to_next_action(&mut self) {
+    fn next_action(&mut self) {
         self.current_action += 1;
         if self.current_action >= self.actions.len() {
             self.current_action = 0;
@@ -270,13 +270,13 @@ impl Game for SpaceInvadersGame {
         delta_time: &Duration,
     ) -> UpdateEvent {
         // quit request
-        let quit_requested = match input {
+        let quit_requested = matches!(
+            input,
             Some(crossterm::event::KeyEvent {
                 code: crossterm::event::KeyCode::Char('q'),
                 ..
-            }) => true,
-            _ => false,
-        };
+            })
+        );
 
         // player movement
         // modifies self.player
@@ -334,8 +334,8 @@ impl Game for SpaceInvadersGame {
                 if self.enemies[enemy_ind].behavior.to_next_move.as_nanos() == 0 {
                     // 'failures is do-while loop
                     'failures: loop {
-                        if is_success(action.chance) {
-                            if match &action.action_type {
+                        if is_success(action.chance)
+                            && match &action.action_type {
                                 EnemyActionType::Move(direction, speed) => {
                                     let next_position = {
                                         match direction {
@@ -387,12 +387,13 @@ impl Game for SpaceInvadersGame {
                                     true
                                 }
                                 EnemyActionType::Wait => true,
-                            } {
-                                self.enemies[enemy_ind].behavior.to_next_move += action.duration;
-                                break 'failures;
                             }
+                        {
+                            self.enemies[enemy_ind].behavior.to_next_move += action.duration;
+                            self.enemies[enemy_ind].behavior.next_action();
+                            break 'failures;
                         }
-                        self.enemies[enemy_ind].behavior.to_next_action();
+                        self.enemies[enemy_ind].behavior.next_action();
 
                         if self.enemies[enemy_ind].behavior.current_action == start_action_ind {
                             break 'failures;

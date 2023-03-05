@@ -69,8 +69,7 @@ fn main() -> crossterm::Result<()> {
                 &mut space_invaders
             }
             Some(MenuChoice::Exit) => break 'main_loop,
-            Some(MenuChoice::LastElement) => unreachable!(),
-            None => unreachable!(),
+            Some(MenuChoice::LastElement) | None => unreachable!(),
         };
 
         let mut prev_time = std::time::SystemTime::now();

@@ -79,7 +79,7 @@ impl FigureType {
         }
     }
 
-    pub fn get_points_and_pivot<'a>(&'a self) -> &'static ([Point; 4], Point) {
+    pub fn get_points_and_pivot(&self) -> &'static ([Point; 4], Point) {
         match self {
             FigureType::Square => &(
                 [
@@ -158,7 +158,7 @@ impl Figure {
 
     pub fn applied_rotation_and_position(&self, rotation: f32, position: Point) -> [Point; 4] {
         let (points, pivot) = self.figure_type.get_points_and_pivot();
-        let mut points = points.clone();
+        let mut points = *points;
         for point in points.iter_mut() {
             let x = point.x - pivot.x;
             let y = point.y - pivot.y;
@@ -215,6 +215,12 @@ impl TetrisGame {
     }
 }
 
+impl Default for TetrisGame {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Game for TetrisGame {
     fn update(
         &mut self,
@@ -268,9 +274,9 @@ impl Game for TetrisGame {
                 }
                 // Descend faster
                 if input.code == KeyCode::Down {
-                    self.to_descend = TO_DESCEND_FAST
+                    self.to_descend = TO_DESCEND_FAST;
                 } else {
-                    self.to_descend = TO_DESCEND_SLOW
+                    self.to_descend = TO_DESCEND_SLOW;
                 }
             }
 
@@ -329,7 +335,7 @@ impl Game for TetrisGame {
                 .iter()
             {
                 self.board[p.y.round() as usize][p.x.round() as usize] =
-                    Some(self.current_figure.figure_type.get_color())
+                    Some(self.current_figure.figure_type.get_color());
             }
 
             self.current_figure = self.next_figure;
@@ -345,7 +351,7 @@ impl Game for TetrisGame {
 
         // Check for cleared lines
         {
-            let mut curr_base_line = HEIGHT - 1 as usize;
+            let mut curr_base_line = HEIGHT - 1_usize;
 
             while curr_base_line > LOSE_LINE.round() as usize {
                 let mut lines_in_row = 0;
