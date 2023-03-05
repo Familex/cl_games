@@ -48,7 +48,7 @@ pub struct EnemyAction {
 }
 
 impl EnemyAction {
-    fn new(action_type: EnemyActionType, duration: Duration, chance: f32) -> Self {
+    pub fn new(action_type: EnemyActionType, duration: Duration, chance: f32) -> Self {
         assert!(chance >= 0.0 && chance <= 100.0);
 
         Self {
@@ -56,6 +56,30 @@ impl EnemyAction {
             duration,
             chance,
         }
+    }
+
+    fn move_by_one(direction: Direction, chance: f32) -> Self {
+        Self::new(
+            EnemyActionType::Move(direction, 1.0),
+            Duration::from_secs(1),
+            chance,
+        )
+    }
+
+    pub fn left(chance: f32) -> Self {
+        Self::move_by_one(Direction::Left, chance)
+    }
+
+    pub fn right(chance: f32) -> Self {
+        Self::move_by_one(Direction::Right, chance)
+    }
+
+    pub fn up(chance: f32) -> Self {
+        Self::move_by_one(Direction::Up, chance)
+    }
+
+    pub fn down(chance: f32) -> Self {
+        Self::move_by_one(Direction::Down, chance)
     }
 }
 
@@ -155,18 +179,7 @@ impl SpaceInvadersGame {
                                     y: y as f32,
                                 },
                                 behavior: EnemyBehavior::new(
-                                    vec![
-                                        EnemyAction::new(
-                                            EnemyActionType::Move(Direction::Right, 1.0),
-                                            Duration::from_millis(1000),
-                                            100.0,
-                                        ),
-                                        EnemyAction::new(
-                                            EnemyActionType::Move(Direction::Left, 1.0),
-                                            Duration::from_millis(1000),
-                                            100.0,
-                                        ),
-                                    ],
+                                    vec![EnemyAction::right(100.0), EnemyAction::left(100.0)],
                                     Duration::from_millis(0),
                                     0,
                                 ),
@@ -186,26 +199,10 @@ impl SpaceInvadersGame {
                                 },
                                 behavior: EnemyBehavior::new(
                                     vec![
-                                        EnemyAction::new(
-                                            EnemyActionType::Move(Direction::Right, 1.0),
-                                            Duration::from_millis(1000),
-                                            100.0,
-                                        ),
-                                        EnemyAction::new(
-                                            EnemyActionType::Move(Direction::Down, 1.0),
-                                            Duration::from_millis(1000),
-                                            100.0,
-                                        ),
-                                        EnemyAction::new(
-                                            EnemyActionType::Move(Direction::Left, 1.0),
-                                            Duration::from_millis(1000),
-                                            100.0,
-                                        ),
-                                        EnemyAction::new(
-                                            EnemyActionType::Move(Direction::Up, 1.0),
-                                            Duration::from_millis(1000),
-                                            100.0,
-                                        ),
+                                        EnemyAction::right(100.0),
+                                        EnemyAction::down(100.0),
+                                        EnemyAction::left(100.0),
+                                        EnemyAction::up(100.0),
                                     ],
                                     Duration::from_millis(0),
                                     0,
@@ -225,11 +222,7 @@ impl SpaceInvadersGame {
                                     y: y as f32,
                                 },
                                 behavior: EnemyBehavior::new(
-                                    vec![EnemyAction::new(
-                                        EnemyActionType::Move(Direction::Left, 1.0),
-                                        Duration::from_millis(1000),
-                                        100.0,
-                                    )],
+                                    vec![EnemyAction::left(100.0)],
                                     Duration::from_millis(0),
                                     0,
                                 ),
@@ -331,59 +324,74 @@ impl Game for SpaceInvadersGame {
                 let enemy_position = self.enemies[enemy_ind].position.clone();
                 let behavior = std::cell::RefCell::new(&mut self.enemies[enemy_ind].behavior);
                 let action = behavior.borrow().current_action();
+                let start_action_ind = behavior.borrow().current_action;
                 if self.enemies[enemy_ind].behavior.to_next_move.as_nanos() == 0 {
-                    if is_success(action.chance) {
-                        if match &action.action_type {
-                            EnemyActionType::Move(direction, speed) => {
-                                let next_position = {
-                                    match direction {
-                                        Direction::Up => Point {
-                                            x: enemy_position.x,
-                                            y: enemy_position.y - speed,
-                                        },
-                                        Direction::Down => Point {
-                                            x: enemy_position.x,
-                                            y: enemy_position.y + speed,
-                                        },
-                                        Direction::Left => Point {
-                                            x: enemy_position.x - speed,
-                                            y: enemy_position.y,
-                                        },
-                                        Direction::Right => Point {
-                                            x: enemy_position.x + speed,
-                                            y: enemy_position.y,
-                                        },
+                    // 'failures is do-while loop
+                    'failures: loop {
+                        if is_success(action.chance) {
+                            if match &action.action_type {
+                                EnemyActionType::Move(direction, speed) => {
+                                    let next_position = {
+                                        match direction {
+                                            Direction::Up => Point {
+                                                x: enemy_position.x,
+                                                y: enemy_position.y - speed,
+                                            },
+                                            Direction::Down => Point {
+                                                x: enemy_position.x,
+                                                y: enemy_position.y + speed,
+                                            },
+                                            Direction::Left => Point {
+                                                x: enemy_position.x - speed,
+                                                y: enemy_position.y,
+                                            },
+                                            Direction::Right => Point {
+                                                x: enemy_position.x + speed,
+                                                y: enemy_position.y,
+                                            },
+                                        }
+                                    };
+                                    if bounds_check(&next_position)
+                                        && self.enemies.iter().enumerate().all(
+                                            |(other_ind, other)| {
+                                                other_ind == enemy_ind
+                                                    || other.position != next_position
+                                            },
+                                        )
+                                        && self
+                                            .props
+                                            .iter()
+                                            .all(|prop| prop.position != next_position)
+                                    {
+                                        self.enemies[enemy_ind].position = next_position;
+                                        true
+                                    } else {
+                                        false
                                     }
-                                };
-                                if bounds_check(&next_position)
-                                    && self.enemies.iter().enumerate().all(|(other_ind, other)| {
-                                        other_ind == enemy_ind || other.position != next_position
-                                    })
-                                    && self.props.iter().all(|prop| prop.position != next_position)
-                                {
-                                    self.enemies[enemy_ind].position = next_position;
-                                    true
-                                } else {
-                                    false
                                 }
+                                EnemyActionType::Fire(direction, speed) => {
+                                    self.bullets.push(Bullet {
+                                        move_direction: *direction,
+                                        position: Point {
+                                            x: enemy_position.x,
+                                            y: enemy_position.y + FIRE_BULLET_OFFSET,
+                                        },
+                                        speed: *speed,
+                                    });
+                                    true
+                                }
+                                EnemyActionType::Wait => true,
+                            } {
+                                self.enemies[enemy_ind].behavior.to_next_move += action.duration;
+                                break 'failures;
                             }
-                            EnemyActionType::Fire(direction, speed) => {
-                                self.bullets.push(Bullet {
-                                    move_direction: *direction,
-                                    position: Point {
-                                        x: enemy_position.x,
-                                        y: enemy_position.y + FIRE_BULLET_OFFSET,
-                                    },
-                                    speed: *speed,
-                                });
-                                true
-                            }
-                            EnemyActionType::Wait => true,
-                        } {
-                            self.enemies[enemy_ind].behavior.to_next_move += action.duration;
+                        }
+                        self.enemies[enemy_ind].behavior.to_next_action();
+
+                        if self.enemies[enemy_ind].behavior.current_action == start_action_ind {
+                            break 'failures;
                         }
                     }
-                    self.enemies[enemy_ind].behavior.to_next_action()
                 }
                 self.enemies[enemy_ind].behavior.delta(*delta_time);
             }
@@ -391,6 +399,7 @@ impl Game for SpaceInvadersGame {
 
         // bullets movement
         // modifies bullets
+        // FIXME not work on a certain terminal scale
         {
             for bullet in &mut self.bullets {
                 let bullet_position = &mut bullet.position;
