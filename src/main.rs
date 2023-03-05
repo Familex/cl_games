@@ -63,8 +63,8 @@ fn main() -> crossterm::Result<()> {
                 space_invaders = space_invaders::SpaceInvadersGame::new(
                     h,
                     w,
-                    space_invaders::EnemyPreset::CheckeredRightDownLeftUp,
-                    space_invaders::PropsPreset::Empty,
+                    space_invaders::EnemyPreset::RandomFire,
+                    space_invaders::PropsPreset::Wall,
                 );
                 &mut space_invaders
             }

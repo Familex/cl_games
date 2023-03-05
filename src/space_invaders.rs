@@ -3,7 +3,7 @@ use rand::Rng;
 use std::time::Duration;
 
 const FOR_ENEMY_SCORE: usize = 1;
-const FOR_PROP_SCORE: usize = 1;
+const FOR_PROP_SCORE: usize = 0;
 const FIRE_BULLET_OFFSET: f32 = 1.0;
 
 pub fn is_success(chance: f32) -> bool {
@@ -87,6 +87,18 @@ impl EnemyAction {
     pub fn down(chance: f32) -> Self {
         Self::move_by_one(Direction::Down, chance)
     }
+
+    pub fn wait(duration: Duration, chance: f32) -> Self {
+        Self::new(EnemyActionType::Wait, duration, chance)
+    }
+
+    pub fn fire_down(chance: f32) -> Self {
+        Self::new(
+            EnemyActionType::Fire(Direction::Down, 1.0),
+            Duration::from_secs(1),
+            chance,
+        )
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -99,6 +111,7 @@ pub struct EnemyBehavior {
 impl EnemyBehavior {
     fn new(actions: Vec<EnemyAction>, to_next_move: Duration, current_action: usize) -> Self {
         assert!(current_action < actions.len());
+        assert!(!actions.is_empty());
 
         Self {
             actions,
@@ -134,7 +147,7 @@ pub struct Enemy {
     behavior: EnemyBehavior,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Prop {
     position: Point,
     destroyable: bool,
@@ -157,10 +170,12 @@ pub enum EnemyPreset {
     CheckeredLeftRight,
     CheckeredRightDownLeftUp,
     CheckeredLeft,
+    RandomFire,
 }
 
 pub enum PropsPreset {
     Empty,
+    Wall,
 }
 
 impl SpaceInvadersGame {
@@ -237,13 +252,63 @@ impl SpaceInvadersGame {
                     }
                     enemies
                 }
+                EnemyPreset::RandomFire => {
+                    let mut enemies = vec![];
+                    for y in 0..8 {
+                        for x in 0..screen_width / 2 / 7 {
+                            enemies.push(Enemy {
+                                position: Point {
+                                    x: x as f32 * 7.0
+                                        + y as f32
+                                        + (rand::random::<u8>() % 7) as f32,
+                                    y: y as f32,
+                                },
+                                behavior: EnemyBehavior::new(
+                                    vec![
+                                        EnemyAction::fire_down(10.0),
+                                        EnemyAction::left(20.0),
+                                        EnemyAction::down(5.0),
+                                        EnemyAction::wait(Duration::from_secs(1), 50.0),
+                                    ],
+                                    Duration::from_millis(0),
+                                    0,
+                                ),
+                            });
+                        }
+                    }
+                    enemies
+                }
             },
             props: match props_preset {
                 PropsPreset::Empty => vec![],
+                PropsPreset::Wall => {
+                    let mut props = vec![];
+                    for x in 0..screen_width / 2 / 2 {
+                        props.push(Prop {
+                            position: Point {
+                                x: x as f32 * 2.0,
+                                y: screen_height as f32 - 3.0,
+                            },
+                            destroyable: false,
+                        });
+                    }
+                    for x in 0..screen_width / 2 {
+                        for y in 0..3 {
+                            props.push(Prop {
+                                position: Point {
+                                    x: x as f32,
+                                    y: screen_height as f32 - 4.0 - y as f32,
+                                },
+                                destroyable: true,
+                            });
+                        }
+                    }
+                    props
+                }
             },
             player: Player {
                 position: Point {
-                    x: (screen_width as f32 / 2.0 / 2.0).round(),
+                    x: (screen_width / 2 / 2) as f32,
                     y: screen_height as f32 - 1.0,
                 },
             },
@@ -498,11 +563,11 @@ impl Game for SpaceInvadersGame {
             });
             self.props.retain(|prop| {
                 let is_collided = props_collision_state.next().unwrap();
-                !is_collided && prop.destroyable
+                !is_collided || !prop.destroyable
             });
         }
 
-        if is_player_collided || quit_requested {
+        if is_player_collided || quit_requested || self.enemies.is_empty() {
             UpdateEvent::GameOver
         } else {
             UpdateEvent::GameContinue
@@ -510,7 +575,12 @@ impl Game for SpaceInvadersGame {
     }
 
     fn draw(&self, out: &mut std::io::Stdout, _delta_time: &Duration) -> crossterm::Result<()> {
-        use crossterm::{cursor::MoveTo, execute, style, terminal::size};
+        use crossterm::{
+            cursor::MoveTo,
+            execute,
+            style::{Print, Stylize},
+            terminal::size,
+        };
         use std::io::Write;
 
         let (max_x, max_y) = size().expect("Failed to get terminal size");
@@ -523,7 +593,7 @@ impl Game for SpaceInvadersGame {
                 execute!(
                     out,
                     MoveTo(enemy_position.x as u16 * 2, enemy_position.y as u16),
-                    style::Print("◥◤")
+                    Print("◥◤".red())
                 )?;
             }
         }
@@ -536,7 +606,11 @@ impl Game for SpaceInvadersGame {
                 execute!(
                     out,
                     MoveTo(bullet_position.x as u16 * 2, bullet_position.y as u16),
-                    style::Print("<>")
+                    Print(match bullet.move_direction {
+                        Direction::Up => "<>".green(),
+                        Direction::Left | Direction::Right => "<>".yellow(),
+                        Direction::Down => "<>".red(),
+                    })
                 )?;
             }
         }
@@ -549,7 +623,11 @@ impl Game for SpaceInvadersGame {
                 execute!(
                     out,
                     MoveTo(prop_position.x as u16 * 2, prop_position.y as u16),
-                    style::Print("▓▓")
+                    Print(if prop.destroyable {
+                        "▓▓".green()
+                    } else {
+                        "▓▓".blue()
+                    })
                 )?;
             }
         }
@@ -582,7 +660,7 @@ impl Game for SpaceInvadersGame {
             execute!(
                 out,
                 MoveTo(player_position.x as u16 * 2, player_position.y as u16),
-                style::Print("◢◣")
+                Print("◢◣".green())
             )?;
         }
 
