@@ -34,30 +34,54 @@ pub struct Bullet {
 }
 
 #[derive(Clone, Debug)]
-pub enum EnemyBehaviorType {
+pub enum EnemyActionType {
     Move(Direction, f32),
     Fire(Direction, f32),
     Wait,
 }
 
 #[derive(Clone, Debug)]
-pub struct EnemyBehaviorAction {
-    action_type: EnemyBehaviorType,
+pub struct EnemyAction {
+    action_type: EnemyActionType,
     duration: Duration,
     chance: f32,
 }
 
+impl EnemyAction {
+    fn new(action_type: EnemyActionType, duration: Duration, chance: f32) -> Self {
+        assert!(chance >= 0.0 && chance <= 100.0);
+
+        Self {
+            action_type,
+            duration,
+            chance,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct EnemyBehavior {
-    behavior_line: Vec<EnemyBehaviorAction>,
+    actions: Vec<EnemyAction>,
     to_next_move: Duration,
     current_action: usize,
+}
+
+impl EnemyBehavior {
+    fn new(actions: Vec<EnemyAction>, to_next_move: Duration, current_action: usize) -> Self {
+        assert!(current_action < actions.len());
+
+        Self {
+            actions,
+            to_next_move,
+            current_action,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct Enemy {
     position: Point,
-    behaviour: EnemyBehavior,
+    behavior: EnemyBehavior,
 }
 
 #[derive(Clone)]
@@ -109,28 +133,22 @@ impl SpaceInvadersGame {
                                     x: x as f32 * 2.0 + y as f32 % 2.0,
                                     y: y as f32,
                                 },
-                                behaviour: EnemyBehavior {
-                                    behavior_line: vec![
-                                        EnemyBehaviorAction {
-                                            action_type: EnemyBehaviorType::Move(
-                                                Direction::Right,
-                                                1.0,
-                                            ),
-                                            duration: Duration::from_millis(1000),
-                                            chance: 100.0,
-                                        },
-                                        EnemyBehaviorAction {
-                                            action_type: EnemyBehaviorType::Move(
-                                                Direction::Left,
-                                                1.0,
-                                            ),
-                                            duration: Duration::from_millis(1000),
-                                            chance: 100.0,
-                                        },
+                                behavior: EnemyBehavior::new(
+                                    vec![
+                                        EnemyAction::new(
+                                            EnemyActionType::Move(Direction::Right, 1.0),
+                                            Duration::from_millis(1000),
+                                            100.0,
+                                        ),
+                                        EnemyAction::new(
+                                            EnemyActionType::Move(Direction::Left, 1.0),
+                                            Duration::from_millis(1000),
+                                            100.0,
+                                        ),
                                     ],
-                                    to_next_move: Duration::from_millis(0),
-                                    current_action: 0,
-                                },
+                                    Duration::from_millis(0),
+                                    0,
+                                ),
                             });
                         }
                     }
@@ -145,44 +163,32 @@ impl SpaceInvadersGame {
                                     x: x as f32 * 2.0 + y as f32 % 2.0,
                                     y: y as f32,
                                 },
-                                behaviour: EnemyBehavior {
-                                    behavior_line: vec![
-                                        EnemyBehaviorAction {
-                                            action_type: EnemyBehaviorType::Move(
-                                                Direction::Right,
-                                                1.0,
-                                            ),
-                                            duration: Duration::from_millis(1000),
-                                            chance: 100.0,
-                                        },
-                                        EnemyBehaviorAction {
-                                            action_type: EnemyBehaviorType::Move(
-                                                Direction::Down,
-                                                1.0,
-                                            ),
-                                            duration: Duration::from_millis(1000),
-                                            chance: 100.0,
-                                        },
-                                        EnemyBehaviorAction {
-                                            action_type: EnemyBehaviorType::Move(
-                                                Direction::Left,
-                                                1.0,
-                                            ),
-                                            duration: Duration::from_millis(1000),
-                                            chance: 100.0,
-                                        },
-                                        EnemyBehaviorAction {
-                                            action_type: EnemyBehaviorType::Move(
-                                                Direction::Up,
-                                                1.0,
-                                            ),
-                                            duration: Duration::from_millis(1000),
-                                            chance: 100.0,
-                                        },
+                                behavior: EnemyBehavior::new(
+                                    vec![
+                                        EnemyAction::new(
+                                            EnemyActionType::Move(Direction::Right, 1.0),
+                                            Duration::from_millis(1000),
+                                            100.0,
+                                        ),
+                                        EnemyAction::new(
+                                            EnemyActionType::Move(Direction::Down, 1.0),
+                                            Duration::from_millis(1000),
+                                            100.0,
+                                        ),
+                                        EnemyAction::new(
+                                            EnemyActionType::Move(Direction::Left, 1.0),
+                                            Duration::from_millis(1000),
+                                            100.0,
+                                        ),
+                                        EnemyAction::new(
+                                            EnemyActionType::Move(Direction::Up, 1.0),
+                                            Duration::from_millis(1000),
+                                            100.0,
+                                        ),
                                     ],
-                                    to_next_move: Duration::from_millis(0),
-                                    current_action: 0,
-                                },
+                                    Duration::from_millis(0),
+                                    0,
+                                ),
                             });
                         }
                     }
@@ -278,13 +284,13 @@ impl Game for SpaceInvadersGame {
         // FIXME deobfuscate self variables access (cause of borrow checker)
         {
             for enemy_ind in 0..self.enemies.len() {
-                let action = self.enemies[enemy_ind].behaviour.behavior_line
-                    [self.enemies[enemy_ind].behaviour.current_action]
+                let action = self.enemies[enemy_ind].behavior.actions
+                    [self.enemies[enemy_ind].behavior.current_action]
                     .clone();
-                while self.enemies[enemy_ind].behaviour.to_next_move.as_nanos() == 0 {
+                while self.enemies[enemy_ind].behavior.to_next_move.as_nanos() == 0 {
                     if is_success(action.chance) {
                         if match &action.action_type {
-                            EnemyBehaviorType::Move(direction, speed) => {
+                            EnemyActionType::Move(direction, speed) => {
                                 let next_position = {
                                     //let enemy = &self.enemies[enemy_ind];
                                     match direction {
@@ -318,7 +324,7 @@ impl Game for SpaceInvadersGame {
                                     false
                                 }
                             }
-                            EnemyBehaviorType::Fire(direction, speed) => {
+                            EnemyActionType::Fire(direction, speed) => {
                                 self.bullets.push(Bullet {
                                     move_direction: *direction,
                                     position: Point {
@@ -329,23 +335,23 @@ impl Game for SpaceInvadersGame {
                                 });
                                 true
                             }
-                            EnemyBehaviorType::Wait => true,
+                            EnemyActionType::Wait => true,
                         } {
                             let duration = action.duration;
-                            self.enemies[enemy_ind].behaviour.to_next_move += duration;
+                            self.enemies[enemy_ind].behavior.to_next_move += duration;
                         }
                     }
-                    self.enemies[enemy_ind].behaviour.current_action += 1;
-                    if self.enemies[enemy_ind].behaviour.current_action
-                        >= self.enemies[enemy_ind].behaviour.behavior_line.len()
+                    self.enemies[enemy_ind].behavior.current_action += 1;
+                    if self.enemies[enemy_ind].behavior.current_action
+                        >= self.enemies[enemy_ind].behavior.actions.len()
                     {
-                        self.enemies[enemy_ind].behaviour.current_action = 0;
+                        self.enemies[enemy_ind].behavior.current_action = 0;
                     }
                 }
-                if self.enemies[enemy_ind].behaviour.to_next_move < *delta_time {
-                    self.enemies[enemy_ind].behaviour.to_next_move = Duration::from_nanos(0);
+                if self.enemies[enemy_ind].behavior.to_next_move < *delta_time {
+                    self.enemies[enemy_ind].behavior.to_next_move = Duration::from_nanos(0);
                 } else {
-                    self.enemies[enemy_ind].behaviour.to_next_move -= *delta_time;
+                    self.enemies[enemy_ind].behavior.to_next_move -= *delta_time;
                 }
             }
         }
