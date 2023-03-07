@@ -12,7 +12,7 @@ pub fn is_success(chance: f32) -> bool {
     random < chance / 100.0
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialOrd)]
 pub struct Point {
     x: f32,
     y: f32,
