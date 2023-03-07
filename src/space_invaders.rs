@@ -389,14 +389,15 @@ impl Game for SpaceInvadersGame {
 
         // enemies movement
         // modifies self.enemies
-        // FIXME deobfuscate self variables access (cause of borrow checker)
         {
-            for enemy_ind in 0..self.enemies.len() {
-                let enemy_position = self.enemies[enemy_ind].position.clone();
-                let behavior = std::cell::RefCell::new(&mut self.enemies[enemy_ind].behavior);
-                let action = behavior.borrow().current_action();
-                let start_action_ind = behavior.borrow().current_action;
-                if self.enemies[enemy_ind].behavior.to_next_move.as_nanos() == 0 {
+            let mut new_enemies = self.enemies.clone();
+
+            for new_enemy in &mut new_enemies {
+                let action = new_enemy.behavior.current_action();
+                let ref mut behavior = new_enemy.behavior;
+                let start_action_ind = behavior.current_action;
+
+                if behavior.to_next_move.as_nanos() == 0 {
                     // 'failures is do-while loop
                     'failures: loop {
                         if is_success(action.chance)
@@ -405,36 +406,35 @@ impl Game for SpaceInvadersGame {
                                     let next_position = {
                                         match direction {
                                             Direction::Up => Point {
-                                                x: enemy_position.x,
-                                                y: enemy_position.y - speed,
+                                                x: new_enemy.position.x,
+                                                y: new_enemy.position.y - speed,
                                             },
                                             Direction::Down => Point {
-                                                x: enemy_position.x,
-                                                y: enemy_position.y + speed,
+                                                x: new_enemy.position.x,
+                                                y: new_enemy.position.y + speed,
                                             },
                                             Direction::Left => Point {
-                                                x: enemy_position.x - speed,
-                                                y: enemy_position.y,
+                                                x: new_enemy.position.x - speed,
+                                                y: new_enemy.position.y,
                                             },
                                             Direction::Right => Point {
-                                                x: enemy_position.x + speed,
-                                                y: enemy_position.y,
+                                                x: new_enemy.position.x + speed,
+                                                y: new_enemy.position.y,
                                             },
                                         }
                                     };
                                     if bounds_check(&next_position)
-                                        && self.enemies.iter().enumerate().all(
-                                            |(other_ind, other)| {
-                                                other_ind == enemy_ind
-                                                    || other.position != next_position
-                                            },
-                                        )
+                                        && self
+                                            .enemies
+                                            .iter()
+                                            .all(|other| other.position != next_position 
+                                            /* check with self will forbid to move on the spot */ )
                                         && self
                                             .props
                                             .iter()
                                             .all(|prop| prop.position != next_position)
                                     {
-                                        self.enemies[enemy_ind].position = next_position;
+                                        new_enemy.position = next_position;
                                         true
                                     } else {
                                         false
@@ -444,8 +444,8 @@ impl Game for SpaceInvadersGame {
                                     self.bullets.push(Bullet {
                                         move_direction: *direction,
                                         position: Point {
-                                            x: enemy_position.x,
-                                            y: enemy_position.y + FIRE_BULLET_OFFSET,
+                                            x: new_enemy.position.x,
+                                            y: new_enemy.position.y + FIRE_BULLET_OFFSET,
                                         },
                                         speed: *speed,
                                     });
@@ -454,19 +454,21 @@ impl Game for SpaceInvadersGame {
                                 EnemyActionType::Wait => true,
                             }
                         {
-                            self.enemies[enemy_ind].behavior.to_next_move += action.duration;
-                            self.enemies[enemy_ind].behavior.next_action();
+                            behavior.to_next_move += action.duration;
+                            behavior.next_action();
                             break 'failures;
                         }
-                        self.enemies[enemy_ind].behavior.next_action();
+                        behavior.next_action();
 
-                        if self.enemies[enemy_ind].behavior.current_action == start_action_ind {
+                        if behavior.current_action == start_action_ind {
                             break 'failures;
                         }
                     }
                 }
-                self.enemies[enemy_ind].behavior.delta(*delta_time);
+                behavior.delta(*delta_time);
             }
+
+            self.enemies = new_enemies;
         }
 
         // bullets movement
