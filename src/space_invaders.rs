@@ -381,6 +381,10 @@ impl Game for SpaceInvadersGame {
             if let Some(next_position) = next_position {
                 if bounds_check(&next_position)
                     && self.props.iter().all(|prop| prop.position != next_position)
+                    && self
+                        .enemies
+                        .iter()
+                        .all(|enemy| enemy.position != next_position)
                 {
                     self.player.position = next_position;
                 }
@@ -427,12 +431,13 @@ impl Game for SpaceInvadersGame {
                                         && self
                                             .enemies
                                             .iter()
-                                            .all(|other| other.position != next_position 
+                                            .all(|other| other.position != next_position
                                             /* check with self will forbid to move on the spot */ )
                                         && self
                                             .props
                                             .iter()
                                             .all(|prop| prop.position != next_position)
+                                        && self.player.position != next_position
                                     {
                                         new_enemy.position = next_position;
                                         true
