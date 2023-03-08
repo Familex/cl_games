@@ -3,6 +3,11 @@ pub enum UpdateEvent {
     GameContinue,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Score {
+    pub value: i64,
+}
+
 /// A trait that defines the interface for a game.
 pub trait Game {
     /// Update the game state with the given input.
@@ -20,5 +25,5 @@ pub trait Game {
         delta_time: &std::time::Duration,
     ) -> crossterm::Result<()>;
 
-    fn get_score(&self) -> usize;
+    fn get_score(&self) -> Score;
 }

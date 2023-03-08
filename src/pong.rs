@@ -1,4 +1,4 @@
-use crate::game::{Game, UpdateEvent};
+use crate::game::{Game, Score, UpdateEvent};
 use crossterm::{cursor::MoveTo, event::KeyEvent, execute, style::Print, terminal};
 use rand::Rng;
 
@@ -117,9 +117,8 @@ impl Default for PongGame {
 }
 
 impl Game for PongGame {
-    // FIXME sign of score
-    fn get_score(&self) -> usize {
-        self.score as usize
+    fn get_score(&self) -> Score {
+        Score { value: self.score }
     }
 
     fn draw(

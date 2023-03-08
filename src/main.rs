@@ -111,7 +111,7 @@ fn main() -> crossterm::Result<()> {
             prev_time = current_time;
         }
 
-        println!("Game over! Score: {}", game.get_score());
+        println!("Game over! Score: {}", game.get_score().value);
         println!("Press any key to restart.");
         // Wait for prevent the game from restarting immediately
         std::thread::sleep(std::time::Duration::from_millis(750));

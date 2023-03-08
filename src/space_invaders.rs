@@ -1,4 +1,4 @@
-use crate::game::{Game, UpdateEvent};
+use crate::game::{Game, Score, UpdateEvent};
 use rand::Rng;
 use std::time::Duration;
 
@@ -325,8 +325,10 @@ fn bounds_check(position: &Point) -> bool {
 }
 
 impl Game for SpaceInvadersGame {
-    fn get_score(&self) -> usize {
-        self.score
+    fn get_score(&self) -> Score {
+        Score {
+            value: self.score as i64,
+        }
     }
 
     fn update(

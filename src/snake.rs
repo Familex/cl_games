@@ -1,3 +1,4 @@
+use crate::game;
 use crate::game::{Game, UpdateEvent};
 use crossterm::{cursor, execute, style::Stylize, terminal};
 
@@ -329,8 +330,10 @@ impl Game for SnakeGame {
         execute!(out, MoveTo(0, 0))
     }
 
-    fn get_score(&self) -> usize {
-        self.score.0
+    fn get_score(&self) -> game::Score {
+        game::Score {
+            value: self.score.0 as i64,
+        }
     }
 }
 

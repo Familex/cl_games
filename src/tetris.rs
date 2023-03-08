@@ -1,4 +1,4 @@
-use crate::game::{Game, UpdateEvent};
+use crate::game::{Game, Score, UpdateEvent};
 use colored::Colorize;
 use crossterm::style::Stylize;
 use rand::Rng;
@@ -599,8 +599,10 @@ impl Game for TetrisGame {
         execute!(out, MoveTo(0, 0))
     }
 
-    fn get_score(&self) -> usize {
-        self.score
+    fn get_score(&self) -> Score {
+        Score {
+            value: self.score as i64,
+        }
     }
 }
 
