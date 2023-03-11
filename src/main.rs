@@ -1,5 +1,6 @@
 extern crate static_assertions as sa;
 pub mod game;
+pub mod point;
 pub mod pong;
 pub mod snake;
 pub mod space_invaders;
