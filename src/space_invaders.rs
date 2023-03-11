@@ -400,7 +400,7 @@ impl Game for SpaceInvadersGame {
 
             for new_enemy in &mut new_enemies {
                 let action = new_enemy.behavior.current_action();
-                let ref mut behavior = new_enemy.behavior;
+                let behavior = &mut new_enemy.behavior;
                 let start_action_ind = behavior.current_action;
 
                 if behavior.to_next_move.as_nanos() == 0 {
