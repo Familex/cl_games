@@ -5,6 +5,7 @@ pub mod pong;
 pub mod snake;
 pub mod space_invaders;
 pub mod tetris;
+pub mod util;
 
 enum MenuChoice {
     Exit = 0,

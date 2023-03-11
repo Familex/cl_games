@@ -1,27 +1,18 @@
 use crate::game::{Game, Score, UpdateEvent};
+use crate::point::{GameBasis, Point, ScreenBasis};
+use crate::util::MORE_THAN_HALF_CELL;
 use rand::Rng;
 use std::time::Duration;
 
 const FOR_ENEMY_SCORE: usize = 1;
 const FOR_PROP_SCORE: usize = 0;
 const FIRE_BULLET_OFFSET: f32 = 1.0;
+const PLAYER_SPEED: f32 = 0.5;
 
 pub fn is_success(chance: f32) -> bool {
     let mut rng = rand::thread_rng();
     let random: f32 = rng.gen();
     random < chance / 100.0
-}
-
-#[derive(Clone, Debug, PartialOrd)]
-pub struct Point {
-    x: f32,
-    y: f32,
-}
-
-impl PartialEq for Point {
-    fn eq(&self, other: &Self) -> bool {
-        self.x.round() == other.x.round() && self.y.round() == other.y.round()
-    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -35,7 +26,7 @@ pub enum Direction {
 #[derive(Clone, Debug)]
 pub struct Bullet {
     move_direction: Direction,
-    position: Point,
+    position: Point<GameBasis>,
     speed: f32,
 }
 
@@ -143,18 +134,18 @@ impl EnemyBehavior {
 
 #[derive(Clone, Debug)]
 pub struct Enemy {
-    position: Point,
+    position: Point<GameBasis>,
     behavior: EnemyBehavior,
 }
 
 #[derive(Clone, Debug)]
 pub struct Prop {
-    position: Point,
+    position: Point<GameBasis>,
     destroyable: bool,
 }
 
 pub struct Player {
-    position: Point,
+    position: Point<GameBasis>,
 }
 
 pub struct SpaceInvadersGame {
@@ -195,10 +186,7 @@ impl SpaceInvadersGame {
                     for y in 0..5 {
                         for x in 0..screen_width / 2 / 2 {
                             enemies.push(Enemy {
-                                position: Point {
-                                    x: x as f32 * 2.0 + y as f32 % 2.0,
-                                    y: y as f32,
-                                },
+                                position: Point::new(x as f32 * 2.0 + y as f32 % 2.0, y as f32),
                                 behavior: EnemyBehavior::new(
                                     vec![EnemyAction::right(100.0), EnemyAction::left(100.0)],
                                     Duration::from_millis(0),
@@ -214,10 +202,7 @@ impl SpaceInvadersGame {
                     for y in 0..5 {
                         for x in 0..screen_width / 2 / 2 {
                             enemies.push(Enemy {
-                                position: Point {
-                                    x: x as f32 * 2.0 + y as f32 % 2.0,
-                                    y: y as f32,
-                                },
+                                position: Point::new(x as f32 * 2.0 + y as f32 % 2.0, y as f32),
                                 behavior: EnemyBehavior::new(
                                     vec![
                                         EnemyAction::right(100.0),
@@ -238,10 +223,7 @@ impl SpaceInvadersGame {
                     for y in 0..5 {
                         for x in 0..screen_width / 2 / 2 {
                             enemies.push(Enemy {
-                                position: Point {
-                                    x: x as f32 * 2.0 + y as f32 % 2.0,
-                                    y: y as f32,
-                                },
+                                position: Point::new(x as f32 * 2.0 + y as f32 % 2.0, y as f32),
                                 behavior: EnemyBehavior::new(
                                     vec![EnemyAction::left(100.0)],
                                     Duration::from_millis(0),
@@ -257,15 +239,13 @@ impl SpaceInvadersGame {
                     for y in 0..8 {
                         for x in 0..screen_width / 2 / 7 {
                             enemies.push(Enemy {
-                                position: Point {
-                                    x: x as f32 * 7.0
-                                        + y as f32
-                                        + (rand::random::<u8>() % 7) as f32,
-                                    y: y as f32,
-                                },
+                                position: Point::new(
+                                    x as f32 * 7.0 + y as f32 + (rand::random::<u8>() % 7) as f32,
+                                    y as f32,
+                                ),
                                 behavior: EnemyBehavior::new(
                                     vec![
-                                        EnemyAction::fire_down(10.0),
+                                        // EnemyAction::fire_down(10.0),
                                         EnemyAction::left(20.0),
                                         EnemyAction::down(5.0),
                                         EnemyAction::wait(Duration::from_secs(1), 50.0),
@@ -285,20 +265,17 @@ impl SpaceInvadersGame {
                     let mut props = vec![];
                     for x in 0..screen_width / 2 / 2 {
                         props.push(Prop {
-                            position: Point {
-                                x: x as f32 * 2.0,
-                                y: screen_height as f32 - 3.0,
-                            },
+                            position: Point::new(x as f32 * 2.0, screen_height as f32 - 3.0),
                             destroyable: false,
                         });
                     }
                     for x in 0..screen_width / 2 {
                         for y in 0..3 {
                             props.push(Prop {
-                                position: Point {
-                                    x: x as f32,
-                                    y: screen_height as f32 - 4.0 - y as f32,
-                                },
+                                position: Point::new(
+                                    x as f32,
+                                    screen_height as f32 - 4.0 - y as f32,
+                                ),
                                 destroyable: true,
                             });
                         }
@@ -307,21 +284,14 @@ impl SpaceInvadersGame {
                 }
             },
             player: Player {
-                position: Point {
-                    x: (screen_width / 2 / 2) as f32,
-                    y: screen_height as f32 - 1.0,
-                },
+                position: Point::<ScreenBasis>::new(
+                    (screen_width / 2) as f32,
+                    screen_height as f32 - 1.0,
+                )
+                .into(),
             },
         }
     }
-}
-
-fn bounds_check(position: &Point) -> bool {
-    let (max_x, max_y) = crossterm::terminal::size().expect("Failed to get terminal size");
-    position.x /* * 2 */ >= 0.0
-        && position.x.round() * 2.0 < max_x as f32
-        && position.y >= 0.0
-        && position.y.round() < max_y as f32
 }
 
 impl Game for SpaceInvadersGame {
@@ -336,6 +306,9 @@ impl Game for SpaceInvadersGame {
         input: &Option<crossterm::event::KeyEvent>,
         delta_time: &Duration,
     ) -> UpdateEvent {
+        let (screen_width, screen_height) =
+            crossterm::terminal::size().expect("Failed to get terminal size");
+
         // quit request
         let quit_requested = matches!(
             input,
@@ -348,31 +321,28 @@ impl Game for SpaceInvadersGame {
         // player movement
         // modifies self.player
         {
-            let next_position = match input {
+            let next_position: Option<Point<GameBasis>> = match input {
                 Some(crossterm::event::KeyEvent {
                     code: crossterm::event::KeyCode::Left,
                     ..
-                }) => Some(Point {
-                    x: self.player.position.x - 1.0,
-                    y: self.player.position.y,
-                }),
+                }) => Some(Point::new(
+                    self.player.position.x - PLAYER_SPEED,
+                    self.player.position.y,
+                )),
                 Some(crossterm::event::KeyEvent {
                     code: crossterm::event::KeyCode::Right,
                     ..
-                }) => Some(Point {
-                    x: self.player.position.x + 1.0,
-                    y: self.player.position.y,
-                }),
+                }) => Some(Point::new(
+                    self.player.position.x + PLAYER_SPEED,
+                    self.player.position.y,
+                )),
                 Some(crossterm::event::KeyEvent {
                     code: crossterm::event::KeyCode::Char(' '),
                     ..
                 }) => {
                     self.bullets.push(Bullet {
                         move_direction: Direction::Up,
-                        position: Point {
-                            x: self.player.position.x,
-                            y: self.player.position.y - 1.0,
-                        },
+                        position: Point::new(self.player.position.x, self.player.position.y - 1.0),
                         speed: 1.0,
                     });
                     None
@@ -381,12 +351,17 @@ impl Game for SpaceInvadersGame {
             };
 
             if let Some(next_position) = next_position {
-                if bounds_check(&next_position)
-                    && self.props.iter().all(|prop| prop.position != next_position)
+                if next_position
+                    .bounds_check(screen_width, screen_height)
+                    .is_none()
+                    && self
+                        .props
+                        .iter()
+                        .all(|prop| !prop.position.compare(&next_position, MORE_THAN_HALF_CELL))
                     && self
                         .enemies
                         .iter()
-                        .all(|enemy| enemy.position != next_position)
+                        .all(|enemy| !enemy.position.compare(&next_position, MORE_THAN_HALF_CELL))
                 {
                     self.player.position = next_position;
                 }
@@ -409,37 +384,45 @@ impl Game for SpaceInvadersGame {
                         if is_success(action.chance)
                             && match &action.action_type {
                                 EnemyActionType::Move(direction, speed) => {
-                                    let next_position = {
+                                    let next_position: Point<GameBasis> = {
                                         match direction {
-                                            Direction::Up => Point {
-                                                x: new_enemy.position.x,
-                                                y: new_enemy.position.y - speed,
-                                            },
-                                            Direction::Down => Point {
-                                                x: new_enemy.position.x,
-                                                y: new_enemy.position.y + speed,
-                                            },
-                                            Direction::Left => Point {
-                                                x: new_enemy.position.x - speed,
-                                                y: new_enemy.position.y,
-                                            },
-                                            Direction::Right => Point {
-                                                x: new_enemy.position.x + speed,
-                                                y: new_enemy.position.y,
-                                            },
+                                            Direction::Up => Point::new(
+                                                new_enemy.position.x,
+                                                new_enemy.position.y - speed,
+                                            ),
+                                            Direction::Down => Point::new(
+                                                new_enemy.position.x,
+                                                new_enemy.position.y + speed,
+                                            ),
+                                            Direction::Left => Point::new(
+                                                new_enemy.position.x - speed,
+                                                new_enemy.position.y,
+                                            ),
+                                            Direction::Right => Point::new(
+                                                new_enemy.position.x + speed,
+                                                new_enemy.position.y,
+                                            ),
                                         }
                                     };
-                                    if bounds_check(&next_position)
-                                        && self
-                                            .enemies
-                                            .iter()
-                                            .all(|other| other.position != next_position
-                                            /* check with self will forbid to move on the spot */ )
-                                        && self
-                                            .props
-                                            .iter()
-                                            .all(|prop| prop.position != next_position)
-                                        && self.player.position != next_position
+                                    if next_position
+                                        .bounds_check(screen_width, screen_height)
+                                        .is_none()
+                                        && self.enemies.iter().all(
+                                            |other| {
+                                                !other
+                                                    .position
+                                                    .compare(&next_position, MORE_THAN_HALF_CELL)
+                                            }, /* check with self will forbid to move on the spot */
+                                        )
+                                        && self.props.iter().all(|prop| {
+                                            !prop
+                                                .position
+                                                .compare(&next_position, MORE_THAN_HALF_CELL)
+                                        })
+                                        && !self
+                                            .player
+                                            .position
+                                            .compare(&next_position, MORE_THAN_HALF_CELL)
                                     {
                                         new_enemy.position = next_position;
                                         true
@@ -450,10 +433,10 @@ impl Game for SpaceInvadersGame {
                                 EnemyActionType::Fire(direction, speed) => {
                                     self.bullets.push(Bullet {
                                         move_direction: *direction,
-                                        position: Point {
-                                            x: new_enemy.position.x,
-                                            y: new_enemy.position.y + FIRE_BULLET_OFFSET,
-                                        },
+                                        position: Point::new(
+                                            new_enemy.position.x,
+                                            new_enemy.position.y + FIRE_BULLET_OFFSET,
+                                        ),
                                         speed: *speed,
                                     });
                                     true
@@ -501,14 +484,20 @@ impl Game for SpaceInvadersGame {
             }
 
             // delete out of bounds bullets
-            self.bullets.retain(|bullet| bounds_check(&bullet.position));
+            self.bullets.retain(|bullet| {
+                bullet
+                    .position
+                    .bounds_check(screen_width, screen_height)
+                    .is_none()
+            });
         }
 
         // player bullet collision
-        let is_player_collided = self
-            .bullets
-            .iter()
-            .any(|bullet| self.player.position == bullet.position);
+        let is_player_collided = self.bullets.iter().any(|bullet| {
+            self.player
+                .position
+                .compare(&bullet.position, MORE_THAN_HALF_CELL)
+        });
 
         // enemies, bullets, props collision
         // modifies self.bullets, self.enemies, self.props, self.score
@@ -535,7 +524,10 @@ impl Game for SpaceInvadersGame {
                         continue;
                     };
 
-                    if self.bullets[bullet_ind].position == self.enemies[enemy_ind].position {
+                    if self.bullets[bullet_ind]
+                        .position
+                        .compare(&self.enemies[enemy_ind].position, MORE_THAN_HALF_CELL)
+                    {
                         *is_enemy_collided = true;
                         *is_bullet_collided = true;
                         self.score += FOR_ENEMY_SCORE;
@@ -548,7 +540,10 @@ impl Game for SpaceInvadersGame {
                         continue;
                     };
 
-                    if self.bullets[bullet_ind].position == self.props[prop_ind].position {
+                    if self.bullets[bullet_ind]
+                        .position
+                        .compare(&self.props[prop_ind].position, MORE_THAN_HALF_CELL)
+                    {
                         *is_prop_collided = true;
                         *is_bullet_collided = true;
                         if self.props[prop_ind].destroyable {
@@ -596,12 +591,17 @@ impl Game for SpaceInvadersGame {
 
         // enemies
         {
-            let enemies = &self.enemies;
-            for enemy in enemies {
-                let enemy_position = &enemy.position;
+            for enemy_screen_position in self
+                .enemies
+                .iter()
+                .map(|e| Point::<ScreenBasis>::from(e.position))
+            {
                 execute!(
                     out,
-                    MoveTo(enemy_position.x as u16 * 2, enemy_position.y as u16),
+                    MoveTo(
+                        enemy_screen_position.x as u16,
+                        enemy_screen_position.y as u16
+                    ),
                     Print("◥◤".red())
                 )?;
             }
@@ -609,12 +609,15 @@ impl Game for SpaceInvadersGame {
 
         // bullets
         {
-            let bullets = &self.bullets;
-            for bullet in bullets {
-                let bullet_position = &bullet.position;
+            for bullet in &self.bullets {
+                let bullet_screen_position = Point::<ScreenBasis>::from(bullet.position);
+
                 execute!(
                     out,
-                    MoveTo(bullet_position.x as u16 * 2, bullet_position.y as u16),
+                    MoveTo(
+                        bullet_screen_position.x as u16,
+                        bullet_screen_position.y as u16
+                    ),
                     Print(match bullet.move_direction {
                         Direction::Up => "<>".green(),
                         Direction::Left | Direction::Right => "<>".yellow(),
@@ -626,12 +629,12 @@ impl Game for SpaceInvadersGame {
 
         // props
         {
-            let props = &self.props;
-            for prop in props {
-                let prop_position = &prop.position;
+            for prop in &self.props {
+                let prop_screen_position = Point::<ScreenBasis>::from(prop.position);
+
                 execute!(
                     out,
-                    MoveTo(prop_position.x as u16 * 2, prop_position.y as u16),
+                    MoveTo(prop_screen_position.x as u16, prop_screen_position.y as u16),
                     Print(if prop.destroyable {
                         "▓▓".green()
                     } else {
@@ -664,11 +667,14 @@ impl Game for SpaceInvadersGame {
 
         // player
         {
-            let player = &self.player;
-            let player_position = &player.position;
+            let player_screen_position: Point<ScreenBasis> = self.player.position.into();
+
             execute!(
                 out,
-                MoveTo(player_position.x as u16 * 2, player_position.y as u16),
+                MoveTo(
+                    player_screen_position.x as u16,
+                    player_screen_position.y as u16
+                ),
                 Print("◢◣".green())
             )?;
         }
