@@ -45,6 +45,10 @@ where
     pub fn distance_to(&self, other: &Self) -> f32 {
         (*other - *self).length()
     }
+
+    pub fn compare(&self, other: &Self, epsilon: f32) -> bool {
+        (self.x - other.x).abs() < epsilon && (self.y - other.y).abs() < epsilon
+    }
 }
 
 impl<Basis> std::ops::Add for Point<Basis> {

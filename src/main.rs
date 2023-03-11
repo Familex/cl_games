@@ -20,7 +20,8 @@ enum MenuChoice {
 fn main() -> crossterm::Result<()> {
     use crossterm::{cursor, event::read, execute, terminal};
     use game::Game;
-    use snake::{Point, SnakeGame};
+    use point::Point;
+    use snake::SnakeGame;
     use terminal::{Clear, ClearType};
 
     let mut stdout = std::io::stdout();
@@ -54,7 +55,7 @@ fn main() -> crossterm::Result<()> {
             choice
         } {
             Some(MenuChoice::SnakeGame) => {
-                snake = SnakeGame::new(Point { x: 10, y: 10 });
+                snake = SnakeGame::new(Point::new(10.0, 10.0));
                 &mut snake
             }
             Some(MenuChoice::TetrisGame) => {
