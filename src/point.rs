@@ -95,6 +95,7 @@ impl From<Point<GameBasis>> for Point<ScreenBasis> {
     }
 }
 
+#[derive(Debug)]
 pub enum BoundsCollision {
     Top,
     Bottom,
@@ -104,13 +105,13 @@ pub enum BoundsCollision {
 
 impl Point<ScreenBasis> {
     pub fn bounds_check(&self, screen_width: u16, screen_height: u16) -> Option<BoundsCollision> {
-        if self.y < 0.0 {
+        if self.y.round() < 0.0 {
             Some(BoundsCollision::Top)
-        } else if self.y > screen_height as f32 {
+        } else if self.y.round() > screen_height as f32 {
             Some(BoundsCollision::Bottom)
-        } else if self.x < 0.0 {
+        } else if self.x.round() < 0.0 {
             Some(BoundsCollision::Left)
-        } else if self.x > screen_width as f32 {
+        } else if self.x.round() > screen_width as f32 - 2.0 {
             Some(BoundsCollision::Right)
         } else {
             None
