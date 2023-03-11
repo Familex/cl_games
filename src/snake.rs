@@ -1,10 +1,12 @@
 use crate::game;
 use crate::game::{Game, UpdateEvent};
 use crate::point::{GameBasis, Point, ScreenBasis};
+use crate::util::MORE_THAN_HALF_CELL;
 use crossterm::{cursor, execute, style::Stylize, terminal};
 
 const APPLES_MAX: usize = 5;
 const APPLES_SPAWN_RATE: std::time::Duration = std::time::Duration::from_secs(2);
+const SNAKE_SPEED: f32 = 12.0;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Apple(Point<GameBasis>);
@@ -110,7 +112,7 @@ impl Game for SnakeGame {
         let is_collided = {
             let mut is_collided = false;
             for point in self.snake.tail.iter() {
-                if self.snake.head.compare(point, 0.5) {
+                if self.snake.head.compare(point, MORE_THAN_HALF_CELL) {
                     is_collided = true;
                 }
             }
@@ -123,7 +125,11 @@ impl Game for SnakeGame {
             let mut i = 0;
             let mut is_apple_eaten = false;
             while i < self.apples.len() {
-                if self.snake.head.compare(&self.apples[i].0, 0.5) {
+                if self
+                    .snake
+                    .head
+                    .compare(&self.apples[i].0, MORE_THAN_HALF_CELL)
+                {
                     is_apple_eaten = true;
                     self.score += 1;
                     self.apples.remove(i);
@@ -140,11 +146,11 @@ impl Game for SnakeGame {
             if self.apples.len() < APPLES_MAX {
                 /// Check if the given coordinates are on the snake
                 fn is_on_snake(snake: &Snake, coords: Point<GameBasis>) -> bool {
-                    if coords.compare(&snake.head, 0.5) {
+                    if coords.compare(&snake.head, MORE_THAN_HALF_CELL) {
                         return true;
                     }
                     for point in snake.tail.iter() {
-                        if coords.compare(point, 0.5) {
+                        if coords.compare(point, MORE_THAN_HALF_CELL) {
                             return true;
                         }
                     }
@@ -154,7 +160,7 @@ impl Game for SnakeGame {
                 /// Check if the given coordinates are on an apple
                 fn is_on_apple(coords: Point<GameBasis>, apples: &[Apple]) -> bool {
                     for apple in apples.iter() {
-                        if coords.compare(&apple.0, 0.5) {
+                        if coords.compare(&apple.0, MORE_THAN_HALF_CELL) {
                             return true;
                         }
                     }
@@ -211,16 +217,16 @@ impl Game for SnakeGame {
             let deltas = {
                 let mut deltas = Point::<GameBasis>::new(0.0, 0.0);
                 if curr_input.up {
-                    deltas.y -= 1.0;
+                    deltas.y -= SNAKE_SPEED * delta_time.as_secs_f32();
                 }
                 if curr_input.down {
-                    deltas.y += 1.0;
+                    deltas.y += SNAKE_SPEED * delta_time.as_secs_f32();
                 }
                 if curr_input.left {
-                    deltas.x -= 1.0;
+                    deltas.x -= SNAKE_SPEED * delta_time.as_secs_f32();
                 }
                 if curr_input.right {
-                    deltas.x += 1.0;
+                    deltas.x += SNAKE_SPEED * delta_time.as_secs_f32();
                 }
                 deltas
             };

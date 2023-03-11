@@ -7,7 +7,8 @@ use std::time::Duration;
 const FOR_ENEMY_SCORE: usize = 1;
 const FOR_PROP_SCORE: usize = 0;
 const FIRE_BULLET_OFFSET: f32 = 1.0;
-const PLAYER_SPEED: f32 = 0.5;
+const PLAYER_SPEED: f32 = 10.0;
+const GAME_UPDATE_INTERVAL: Duration = Duration::from_millis(500);
 
 pub fn is_success(chance: f32) -> bool {
     let mut rng = rand::thread_rng();
@@ -154,6 +155,7 @@ pub struct SpaceInvadersGame {
     enemies: Vec<Enemy>,
     props: Vec<Prop>,
     player: Player,
+    from_last_update: Duration,
 }
 
 pub enum EnemyPreset {
@@ -245,7 +247,7 @@ impl SpaceInvadersGame {
                                 ),
                                 behavior: EnemyBehavior::new(
                                     vec![
-                                        // EnemyAction::fire_down(10.0),
+                                        EnemyAction::fire_down(10.0),
                                         EnemyAction::left(20.0),
                                         EnemyAction::down(5.0),
                                         EnemyAction::wait(Duration::from_secs(1), 50.0),
@@ -290,6 +292,7 @@ impl SpaceInvadersGame {
                 )
                 .into(),
             },
+            from_last_update: Duration::from_nanos(0),
         }
     }
 }
@@ -309,102 +312,125 @@ impl Game for SpaceInvadersGame {
         let (screen_width, screen_height) =
             crossterm::terminal::size().expect("Failed to get terminal size");
 
-        // quit request
-        let quit_requested = matches!(
-            input,
-            Some(crossterm::event::KeyEvent {
-                code: crossterm::event::KeyCode::Char('q'),
-                ..
-            })
-        );
-
-        // player movement
-        // modifies self.player
+        // last update time
         {
-            let next_position: Option<Point<GameBasis>> = match input {
-                Some(crossterm::event::KeyEvent {
-                    code: crossterm::event::KeyCode::Left,
-                    ..
-                }) => Some(Point::new(
-                    self.player.position.x - PLAYER_SPEED,
-                    self.player.position.y,
-                )),
-                Some(crossterm::event::KeyEvent {
-                    code: crossterm::event::KeyCode::Right,
-                    ..
-                }) => Some(Point::new(
-                    self.player.position.x + PLAYER_SPEED,
-                    self.player.position.y,
-                )),
-                Some(crossterm::event::KeyEvent {
-                    code: crossterm::event::KeyCode::Char(' '),
-                    ..
-                }) => {
-                    self.bullets.push(Bullet {
-                        move_direction: Direction::Up,
-                        position: Point::new(self.player.position.x, self.player.position.y - 1.0),
-                        speed: 1.0,
-                    });
-                    None
-                }
-                _ => None,
-            };
-
-            if let Some(next_position) = next_position {
-                if next_position
-                    .bounds_check(screen_width, screen_height)
-                    .is_none()
-                    && self
-                        .props
-                        .iter()
-                        .all(|prop| !prop.position.compare(&next_position, MORE_THAN_HALF_CELL))
-                    && self
-                        .enemies
-                        .iter()
-                        .all(|enemy| !enemy.position.compare(&next_position, MORE_THAN_HALF_CELL))
-                {
-                    self.player.position = next_position;
-                }
-            }
+            self.from_last_update += *delta_time;
         }
 
-        // enemies movement
-        // modifies self.enemies
-        {
-            let mut new_enemies = self.enemies.clone();
+        // what not depends on self.last_update_time
+        let (quit_requested, is_player_collided) = {
+            // quit request
+            let quit_requested = matches!(
+                input,
+                Some(crossterm::event::KeyEvent {
+                    code: crossterm::event::KeyCode::Char('q'),
+                    ..
+                })
+            );
 
-            for new_enemy in &mut new_enemies {
-                let action = new_enemy.behavior.current_action();
-                let behavior = &mut new_enemy.behavior;
-                let start_action_ind = behavior.current_action;
+            // player movement
+            // modifies self.player
+            {
+                let next_position: Option<Point<GameBasis>> = match input {
+                    Some(crossterm::event::KeyEvent {
+                        code: crossterm::event::KeyCode::Left,
+                        ..
+                    }) => Some(Point::new(
+                        self.player.position.x - PLAYER_SPEED * delta_time.as_secs_f32(),
+                        self.player.position.y,
+                    )),
+                    Some(crossterm::event::KeyEvent {
+                        code: crossterm::event::KeyCode::Right,
+                        ..
+                    }) => Some(Point::new(
+                        self.player.position.x + PLAYER_SPEED * delta_time.as_secs_f32(),
+                        self.player.position.y,
+                    )),
+                    Some(crossterm::event::KeyEvent {
+                        code: crossterm::event::KeyCode::Char(' '),
+                        ..
+                    }) => {
+                        self.bullets.push(Bullet {
+                            move_direction: Direction::Up,
+                            position: Point::new(
+                                self.player.position.x,
+                                self.player.position.y - 1.0,
+                            ),
+                            speed: 1.0,
+                        });
+                        None
+                    }
+                    _ => None,
+                };
 
-                if behavior.to_next_move.as_nanos() == 0 {
-                    // 'failures is do-while loop
-                    'failures: loop {
-                        if is_success(action.chance)
-                            && match &action.action_type {
-                                EnemyActionType::Move(direction, speed) => {
-                                    let next_position: Point<GameBasis> = {
-                                        match direction {
-                                            Direction::Up => Point::new(
-                                                new_enemy.position.x,
-                                                new_enemy.position.y - speed,
-                                            ),
-                                            Direction::Down => Point::new(
-                                                new_enemy.position.x,
-                                                new_enemy.position.y + speed,
-                                            ),
-                                            Direction::Left => Point::new(
-                                                new_enemy.position.x - speed,
-                                                new_enemy.position.y,
-                                            ),
-                                            Direction::Right => Point::new(
-                                                new_enemy.position.x + speed,
-                                                new_enemy.position.y,
-                                            ),
-                                        }
-                                    };
-                                    if next_position
+                if let Some(next_position) = next_position {
+                    if next_position
+                        .bounds_check(screen_width, screen_height)
+                        .is_none()
+                        && self
+                            .props
+                            .iter()
+                            .all(|prop| !prop.position.compare(&next_position, MORE_THAN_HALF_CELL))
+                        && self.enemies.iter().all(|enemy| {
+                            !enemy.position.compare(&next_position, MORE_THAN_HALF_CELL)
+                        })
+                    {
+                        self.player.position = next_position;
+                    }
+                }
+            }
+
+            // player bullet collision
+            let is_player_collided = self.bullets.iter().any(|bullet| {
+                self.player
+                    .position
+                    .compare(&bullet.position, MORE_THAN_HALF_CELL)
+            });
+
+            (quit_requested, is_player_collided)
+        };
+
+        // what depends on self.last_update_time
+        if self.from_last_update > GAME_UPDATE_INTERVAL {
+            self.from_last_update = Duration::from_nanos(0);
+
+            // enemies movement
+            // modifies self.enemies
+            {
+                let mut new_enemies = self.enemies.clone();
+
+                for new_enemy in &mut new_enemies {
+                    let action = new_enemy.behavior.current_action();
+                    let behavior = &mut new_enemy.behavior;
+                    let start_action_ind = behavior.current_action;
+
+                    if behavior.to_next_move.as_nanos() == 0 {
+                        // 'failures is do-while loop
+                        'failures: loop {
+                            if is_success(action.chance)
+                                && match &action.action_type {
+                                    EnemyActionType::Move(direction, speed) => {
+                                        let next_position: Point<GameBasis> = {
+                                            match direction {
+                                                Direction::Up => Point::new(
+                                                    new_enemy.position.x,
+                                                    new_enemy.position.y - speed,
+                                                ),
+                                                Direction::Down => Point::new(
+                                                    new_enemy.position.x,
+                                                    new_enemy.position.y + speed,
+                                                ),
+                                                Direction::Left => Point::new(
+                                                    new_enemy.position.x - speed,
+                                                    new_enemy.position.y,
+                                                ),
+                                                Direction::Right => Point::new(
+                                                    new_enemy.position.x + speed,
+                                                    new_enemy.position.y,
+                                                ),
+                                            }
+                                        };
+                                        if next_position
                                         .bounds_check(screen_width, screen_height)
                                         .is_none()
                                         && self.enemies.iter().all(
@@ -429,146 +455,143 @@ impl Game for SpaceInvadersGame {
                                     } else {
                                         false
                                     }
+                                    }
+                                    EnemyActionType::Fire(direction, speed) => {
+                                        self.bullets.push(Bullet {
+                                            move_direction: *direction,
+                                            position: Point::new(
+                                                new_enemy.position.x,
+                                                new_enemy.position.y + FIRE_BULLET_OFFSET,
+                                            ),
+                                            speed: *speed,
+                                        });
+                                        true
+                                    }
+                                    EnemyActionType::Wait => true,
                                 }
-                                EnemyActionType::Fire(direction, speed) => {
-                                    self.bullets.push(Bullet {
-                                        move_direction: *direction,
-                                        position: Point::new(
-                                            new_enemy.position.x,
-                                            new_enemy.position.y + FIRE_BULLET_OFFSET,
-                                        ),
-                                        speed: *speed,
-                                    });
-                                    true
-                                }
-                                EnemyActionType::Wait => true,
+                            {
+                                behavior.to_next_move += action.duration;
+                                behavior.next_action();
+                                break 'failures;
                             }
-                        {
-                            behavior.to_next_move += action.duration;
                             behavior.next_action();
-                            break 'failures;
-                        }
-                        behavior.next_action();
 
-                        if behavior.current_action == start_action_ind {
-                            break 'failures;
+                            if behavior.current_action == start_action_ind {
+                                break 'failures;
+                            }
+                        }
+                    }
+                    behavior.delta(*delta_time);
+                }
+
+                self.enemies = new_enemies;
+            }
+
+            // bullets movement
+            // modifies bullets
+            {
+                for bullet in &mut self.bullets {
+                    let bullet_position = &mut bullet.position;
+                    let bullet_speed = bullet.speed;
+                    match bullet.move_direction {
+                        Direction::Up => {
+                            bullet_position.y -= bullet_speed;
+                        }
+                        Direction::Down => {
+                            bullet_position.y += bullet_speed;
+                        }
+                        Direction::Left => {
+                            bullet_position.x -= bullet_speed;
+                        }
+                        Direction::Right => {
+                            bullet_position.x += bullet_speed;
                         }
                     }
                 }
-                behavior.delta(*delta_time);
+
+                // delete out of bounds bullets
+                self.bullets.retain(|bullet| {
+                    bullet
+                        .position
+                        .bounds_check(screen_width, screen_height)
+                        .is_none()
+                });
             }
 
-            self.enemies = new_enemies;
-        }
+            // enemies, bullets, props collision
+            // modifies self.bullets, self.enemies, self.props, self.score
+            {
+                // collision states
+                // assigned with self values by index
+                let mut bullets_collision_state: Vec<bool> =
+                    std::iter::repeat(false).take(self.bullets.len()).collect();
+                let mut enemies_collision_state: Vec<bool> =
+                    std::iter::repeat(false).take(self.enemies.len()).collect();
+                let mut props_collision_state: Vec<bool> =
+                    std::iter::repeat(false).take(self.props.len()).collect();
 
-        // bullets movement
-        // modifies bullets
-        {
-            for bullet in &mut self.bullets {
-                let bullet_position = &mut bullet.position;
-                let bullet_speed = bullet.speed;
-                match bullet.move_direction {
-                    Direction::Up => {
-                        bullet_position.y -= bullet_speed;
-                    }
-                    Direction::Down => {
-                        bullet_position.y += bullet_speed;
-                    }
-                    Direction::Left => {
-                        bullet_position.x -= bullet_speed;
-                    }
-                    Direction::Right => {
-                        bullet_position.x += bullet_speed;
-                    }
-                }
-            }
-
-            // delete out of bounds bullets
-            self.bullets.retain(|bullet| {
-                bullet
-                    .position
-                    .bounds_check(screen_width, screen_height)
-                    .is_none()
-            });
-        }
-
-        // player bullet collision
-        let is_player_collided = self.bullets.iter().any(|bullet| {
-            self.player
-                .position
-                .compare(&bullet.position, MORE_THAN_HALF_CELL)
-        });
-
-        // enemies, bullets, props collision
-        // modifies self.bullets, self.enemies, self.props, self.score
-        {
-            // collision states
-            // assigned with self values by index
-            let mut bullets_collision_state: Vec<bool> =
-                std::iter::repeat(false).take(self.bullets.len()).collect();
-            let mut enemies_collision_state: Vec<bool> =
-                std::iter::repeat(false).take(self.enemies.len()).collect();
-            let mut props_collision_state: Vec<bool> =
-                std::iter::repeat(false).take(self.props.len()).collect();
-
-            for (bullet_ind, is_bullet_collided) in bullets_collision_state.iter_mut().enumerate() {
-                if *is_bullet_collided {
-                    continue;
-                };
-
-                // enemy collision
-                for (enemy_ind, is_enemy_collided) in
-                    &mut enemies_collision_state.iter_mut().enumerate()
+                for (bullet_ind, is_bullet_collided) in
+                    bullets_collision_state.iter_mut().enumerate()
                 {
-                    if *is_enemy_collided {
+                    if *is_bullet_collided {
                         continue;
                     };
 
-                    if self.bullets[bullet_ind]
-                        .position
-                        .compare(&self.enemies[enemy_ind].position, MORE_THAN_HALF_CELL)
+                    // enemy collision
+                    for (enemy_ind, is_enemy_collided) in
+                        &mut enemies_collision_state.iter_mut().enumerate()
                     {
-                        *is_enemy_collided = true;
-                        *is_bullet_collided = true;
-                        self.score += FOR_ENEMY_SCORE;
+                        if *is_enemy_collided {
+                            continue;
+                        };
+
+                        if self.bullets[bullet_ind]
+                            .position
+                            .compare(&self.enemies[enemy_ind].position, MORE_THAN_HALF_CELL)
+                        {
+                            *is_enemy_collided = true;
+                            *is_bullet_collided = true;
+                            self.score += FOR_ENEMY_SCORE;
+                        }
                     }
-                }
 
-                // prop collision
-                for (prop_ind, is_prop_collided) in props_collision_state.iter_mut().enumerate() {
-                    if *is_prop_collided {
-                        continue;
-                    };
-
-                    if self.bullets[bullet_ind]
-                        .position
-                        .compare(&self.props[prop_ind].position, MORE_THAN_HALF_CELL)
+                    // prop collision
+                    for (prop_ind, is_prop_collided) in props_collision_state.iter_mut().enumerate()
                     {
-                        *is_prop_collided = true;
-                        *is_bullet_collided = true;
-                        if self.props[prop_ind].destroyable {
-                            self.score += FOR_PROP_SCORE;
+                        if *is_prop_collided {
+                            continue;
+                        };
+
+                        if self.bullets[bullet_ind]
+                            .position
+                            .compare(&self.props[prop_ind].position, MORE_THAN_HALF_CELL)
+                        {
+                            *is_prop_collided = true;
+                            *is_bullet_collided = true;
+                            if self.props[prop_ind].destroyable {
+                                self.score += FOR_PROP_SCORE;
+                            }
                         }
                     }
                 }
+
+                let mut bullets_collision_state = bullets_collision_state.iter();
+                let mut enemies_collision_state = enemies_collision_state.iter();
+                let mut props_collision_state = props_collision_state.iter();
+
+                self.bullets.retain(|_| {
+                    let is_collided = bullets_collision_state.next().unwrap();
+                    !is_collided
+                });
+                self.enemies.retain(|_| {
+                    let is_collided = enemies_collision_state.next().unwrap();
+                    !is_collided
+                });
+                self.props.retain(|prop| {
+                    let is_collided = props_collision_state.next().unwrap();
+                    !is_collided || !prop.destroyable
+                });
             }
-
-            let mut bullets_collision_state = bullets_collision_state.iter();
-            let mut enemies_collision_state = enemies_collision_state.iter();
-            let mut props_collision_state = props_collision_state.iter();
-
-            self.bullets.retain(|_| {
-                let is_collided = bullets_collision_state.next().unwrap();
-                !is_collided
-            });
-            self.enemies.retain(|_| {
-                let is_collided = enemies_collision_state.next().unwrap();
-                !is_collided
-            });
-            self.props.retain(|prop| {
-                let is_collided = props_collision_state.next().unwrap();
-                !is_collided || !prop.destroyable
-            });
         }
 
         if is_player_collided || quit_requested || self.enemies.is_empty() {

@@ -113,7 +113,7 @@ fn main() -> crossterm::Result<()> {
             )?;
 
             // Wait for the next frame
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(Duration::from_millis(10));
 
             prev_time = current_time;
         }

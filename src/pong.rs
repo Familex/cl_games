@@ -6,7 +6,8 @@ use rand::Rng;
 mod planks {
     pub const FROM_BOUNDS_INDENT: u16 = 5;
     pub const DEFAULT_LENGTH: u16 = 5;
-    pub const SPEED: f32 = 2.0;
+    pub const PLAYER_SPEED: f32 = 2.0;
+    pub const ENEMY_SPEED: f32 = 25.0;
     pub const COLLISION_EXTRA_LENGTH: f32 = 1.0;
 }
 mod ball {
@@ -171,10 +172,10 @@ impl Game for PongGame {
             if let Some(key) = input {
                 match key.code {
                     crossterm::event::KeyCode::Left => {
-                        self.player.position.x -= planks::SPEED;
+                        self.player.position.x -= planks::PLAYER_SPEED;
                     }
                     crossterm::event::KeyCode::Right => {
-                        self.player.position.x += planks::SPEED;
+                        self.player.position.x += planks::PLAYER_SPEED;
                     }
                     _ => {}
                 }
@@ -191,9 +192,9 @@ impl Game for PongGame {
             let prev_position = self.enemy.position;
 
             if self.ball.position.x < self.enemy.position.x {
-                self.enemy.position.x -= planks::SPEED;
+                self.enemy.position.x -= planks::ENEMY_SPEED * delta_time.as_secs_f32();
             } else if self.ball.position.x > self.enemy.position.x {
-                self.enemy.position.x += planks::SPEED;
+                self.enemy.position.x += planks::ENEMY_SPEED * delta_time.as_secs_f32();
             }
 
             if !self.enemy.bounds_check(width, None) {
