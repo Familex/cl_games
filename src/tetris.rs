@@ -1,6 +1,8 @@
 use crate::game::{Game, Score, UpdateEvent};
+use crate::point::{GameBasis, Point, ScreenBasis};
 use colored::Colorize;
 use crossterm::style::Stylize;
+use once_cell::sync::Lazy;
 use rand::Rng;
 use std::time::Duration;
 use strum::EnumCount;
@@ -11,7 +13,7 @@ const WIDTH: usize = 10;
 const TO_DESCEND_SLOW: Duration = Duration::from_millis(200);
 const TO_DESCEND_FAST: Duration = Duration::from_millis(50);
 const MINIMUM_USER_INPUT_DISTANCE: Duration = Duration::from_millis(125);
-const INIT_FIGURE_POS: Point = Point { x: 3.0, y: 0.0 };
+const INIT_FIGURE_POS: Point<GameBasis> = Point::new(3.0, 0.0);
 const LOSE_LINE: f32 = 1.0;
 const BORDER_WIDTH: usize = 2; // in symbols!
 const BORDER_HEIGHT: usize = 1;
@@ -44,18 +46,12 @@ pub enum Color {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Point {
-    pub x: f32,
-    pub y: f32,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Figure {
     pub figure_type: FigureType,
     pub rotation: f32, // in radians
 }
 
-#[derive(Clone, Copy, FromRepr, EnumCount, Debug, PartialEq)]
+#[derive(Clone, Copy, FromRepr, EnumCount, Debug, PartialEq, Eq, Hash)]
 pub enum FigureType {
     Square,
     Line,
@@ -65,6 +61,98 @@ pub enum FigureType {
     ZMirrored,
     T,
 }
+
+type PointsAndPivots = ([Point<GameBasis>; 4], Point<GameBasis>);
+
+pub static POINTS_AND_PIVOTS: Lazy<std::collections::HashMap<FigureType, PointsAndPivots>> =
+    Lazy::new(|| {
+        let mut map = std::collections::HashMap::new();
+        map.insert(
+            FigureType::Square,
+            (
+                [
+                    Point::new(0.0, 0.0),
+                    Point::new(1.0, 0.0),
+                    Point::new(0.0, 1.0),
+                    Point::new(1.0, 1.0),
+                ],
+                Point::new(0.5, 0.5),
+            ),
+        );
+        map.insert(
+            FigureType::Line,
+            (
+                [
+                    Point::new(0.0, 0.0),
+                    Point::new(1.0, 0.0),
+                    Point::new(2.0, 0.0),
+                    Point::new(3.0, 0.0),
+                ],
+                Point::new(1.5, 0.5),
+            ),
+        );
+        map.insert(
+            FigureType::L,
+            (
+                [
+                    Point::new(0.0, 0.0),
+                    Point::new(0.0, 1.0),
+                    Point::new(1.0, 1.0),
+                    Point::new(2.0, 1.0),
+                ],
+                Point::new(1.0, 1.0),
+            ),
+        );
+        map.insert(
+            FigureType::LMirrored,
+            (
+                [
+                    Point::new(0.0, 1.0),
+                    Point::new(1.0, 1.0),
+                    Point::new(2.0, 1.0),
+                    Point::new(2.0, 0.0),
+                ],
+                Point::new(1.0, 1.0),
+            ),
+        );
+        map.insert(
+            FigureType::Z,
+            (
+                [
+                    Point::new(0.0, 0.0),
+                    Point::new(1.0, 0.0),
+                    Point::new(1.0, 1.0),
+                    Point::new(2.0, 1.0),
+                ],
+                Point::new(1.0, 0.0),
+            ),
+        );
+        map.insert(
+            FigureType::ZMirrored,
+            (
+                [
+                    Point::new(0.0, 1.0),
+                    Point::new(1.0, 1.0),
+                    Point::new(1.0, 0.0),
+                    Point::new(2.0, 0.0),
+                ],
+                Point::new(1.0, 0.0),
+            ),
+        );
+        map.insert(
+            FigureType::T,
+            (
+                [
+                    Point::new(0.0, 0.0),
+                    Point::new(1.0, 0.0),
+                    Point::new(2.0, 0.0),
+                    Point::new(1.0, 1.0),
+                ],
+                Point::new(1.0, 0.0),
+            ),
+        );
+        map
+    });
 
 impl FigureType {
     pub fn get_color(&self) -> Color {
@@ -79,72 +167,8 @@ impl FigureType {
         }
     }
 
-    pub fn get_points_and_pivot(&self) -> &'static ([Point; 4], Point) {
-        match self {
-            FigureType::Square => &(
-                [
-                    Point { x: 0.0, y: 0.0 },
-                    Point { x: 1.0, y: 0.0 },
-                    Point { x: 0.0, y: 1.0 },
-                    Point { x: 1.0, y: 1.0 },
-                ],
-                Point { x: 0.5, y: 0.5 },
-            ),
-            FigureType::Line => &(
-                [
-                    Point { x: 0.0, y: 0.0 },
-                    Point { x: 1.0, y: 0.0 },
-                    Point { x: 2.0, y: 0.0 },
-                    Point { x: 3.0, y: 0.0 },
-                ],
-                Point { x: 1.5, y: 0.5 },
-            ),
-            FigureType::L => &(
-                [
-                    Point { x: 0.0, y: 0.0 },
-                    Point { x: 0.0, y: 1.0 },
-                    Point { x: 1.0, y: 1.0 },
-                    Point { x: 2.0, y: 1.0 },
-                ],
-                Point { x: 1.0, y: 1.0 },
-            ),
-            FigureType::LMirrored => &(
-                [
-                    Point { x: 0.0, y: 1.0 },
-                    Point { x: 1.0, y: 1.0 },
-                    Point { x: 2.0, y: 1.0 },
-                    Point { x: 2.0, y: 0.0 },
-                ],
-                Point { x: 1.0, y: 1.0 },
-            ),
-            FigureType::Z => &(
-                [
-                    Point { x: 0.0, y: 0.0 },
-                    Point { x: 1.0, y: 0.0 },
-                    Point { x: 1.0, y: 1.0 },
-                    Point { x: 2.0, y: 1.0 },
-                ],
-                Point { x: 1.0, y: 0.0 },
-            ),
-            FigureType::ZMirrored => &(
-                [
-                    Point { x: 0.0, y: 1.0 },
-                    Point { x: 1.0, y: 1.0 },
-                    Point { x: 1.0, y: 0.0 },
-                    Point { x: 2.0, y: 0.0 },
-                ],
-                Point { x: 1.0, y: 0.0 },
-            ),
-            FigureType::T => &(
-                [
-                    Point { x: 0.0, y: 0.0 },
-                    Point { x: 1.0, y: 0.0 },
-                    Point { x: 2.0, y: 0.0 },
-                    Point { x: 1.0, y: 1.0 },
-                ],
-                Point { x: 1.0, y: 0.0 },
-            ),
-        }
+    pub fn get_points_and_pivot(&self) -> &'static ([Point<GameBasis>; 4], Point<GameBasis>) {
+        POINTS_AND_PIVOTS.get(self).unwrap()
     }
 }
 
@@ -156,7 +180,11 @@ impl Figure {
         }
     }
 
-    pub fn applied_rotation_and_position(&self, rotation: f32, position: Point) -> [Point; 4] {
+    pub fn applied_rotation_and_position(
+        &self,
+        rotation: f32,
+        position: Point<GameBasis>,
+    ) -> [Point<GameBasis>; 4] {
         let (points, pivot) = self.figure_type.get_points_and_pivot();
         let mut points = *points;
         for point in points.iter_mut() {
@@ -174,7 +202,7 @@ impl Figure {
 pub struct TetrisGame {
     pub board: [[Option<Color>; WIDTH]; HEIGHT],
     pub current_figure: Figure,
-    pub current_figure_position: Point,
+    pub current_figure_position: Point<GameBasis>,
     pub next_figure: Figure,
     pub score: usize,
     pub to_descend: Duration,
@@ -578,19 +606,20 @@ impl Game for TetrisGame {
             }
             // Draw figure
             {
-                for point in self.next_figure.applied_rotation_and_position(
-                    std::f32::consts::PI / 2.0,
-                    Point {
-                        x: (next_fig_frame::INDENT + BORDER_WIDTH + next_fig_frame::WIDTH / 2)
-                            as f32
-                            / 2.0,
-                        y: (next_fig_frame::INDENT_UP + next_fig_frame::HEIGHT / 2) as f32,
-                    },
-                ) {
-                    execute!(
-                        out,
-                        MoveTo(point.x.round() as u16 * 2, point.y.round() as u16)
-                    )?;
+                for point in self
+                    .next_figure
+                    .applied_rotation_and_position(
+                        std::f32::consts::PI / 2.0,
+                        Point::new(
+                            (next_fig_frame::INDENT + BORDER_WIDTH + next_fig_frame::WIDTH / 2)
+                                as f32
+                                / 2.0,
+                            (next_fig_frame::INDENT_UP + next_fig_frame::HEIGHT / 2) as f32,
+                        ),
+                    )
+                    .map(|p| Point::<ScreenBasis>::from(p))
+                {
+                    execute!(out, MoveTo(point.x.round() as u16, point.y.round() as u16))?;
                     draw_with_color(out, "██", self.next_figure.figure_type.get_color())?;
                 }
             }
