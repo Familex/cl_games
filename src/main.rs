@@ -90,7 +90,11 @@ fn main() -> crossterm::Result<()> {
             let current_time = SystemTime::now();
 
             // Clear the screen
-            execute!(stdout, Clear(ClearType::All))?;
+            execute!(
+                stdout,
+                cursor::MoveTo(0, 0),
+                Clear(ClearType::FromCursorDown)
+            )?;
 
             // Update the game state
             if let game::UpdateEvent::GameOver = game.update(
