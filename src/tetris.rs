@@ -617,7 +617,7 @@ impl Game for TetrisGame {
                             (next_fig_frame::INDENT_UP + next_fig_frame::HEIGHT / 2) as f32,
                         ),
                     )
-                    .map(|p| Point::<ScreenBasis>::from(p))
+                    .map(Point::<ScreenBasis>::from)
                 {
                     execute!(out, MoveTo(point.x.round() as u16, point.y.round() as u16))?;
                     draw_with_color(out, "██", self.next_figure.figure_type.get_color())?;
