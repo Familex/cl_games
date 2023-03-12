@@ -128,7 +128,7 @@ fn main() -> crossterm::Result<()> {
     Ok(())
 }
 
-// https://stackoverflow.com/questions/30012995/how-can-i-read-non-blocking-from-stdin
+/// [how can I read non blocking from stdin](https://stackoverflow.com/questions/30012995/how-can-i-read-non-blocking-from-stdin)
 fn spawn_stdin_channel() -> std::sync::mpsc::Receiver<crossterm::event::KeyEvent> {
     let (tx, rx) = std::sync::mpsc::channel::<crossterm::event::KeyEvent>();
     use crossterm::event::{read, Event};

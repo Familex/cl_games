@@ -1,12 +1,18 @@
 use crate::game;
 use crate::game::{Game, UpdateEvent};
-use crate::point::{GameBasis, Point, ScreenBasis};
+use crate::point::{BoundsCollision, GameBasis, Line, Point, ScreenBasis};
 use crate::util::MORE_THAN_HALF_CELL;
 use crossterm::{cursor, execute, style::Stylize, terminal};
 
-const APPLES_MAX: usize = 5;
-const APPLES_SPAWN_RATE: std::time::Duration = std::time::Duration::from_secs(2);
+mod apples {
+    use crate::util::MORE_THAN_HALF_CELL;
+    pub const MAX: usize = 5;
+    pub const SPAWN_RATE: std::time::Duration = std::time::Duration::from_secs(2);
+    pub const RADIUS: f32 = MORE_THAN_HALF_CELL;
+    pub const GROWTH: f32 = 1.0;
+}
 const SNAKE_SPEED: f32 = 12.0;
+const SNAKE_WIDTH: f32 = 0.5;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Apple(Point<GameBasis>);
@@ -20,16 +26,33 @@ impl std::ops::AddAssign<i32> for Score {
 }
 
 pub struct Snake {
-    pub head: Point<GameBasis>,
-    pub tail: Vec<Point<GameBasis>>,
+    pub segments: Vec<Line<GameBasis>>,
 }
 
 impl Snake {
-    pub fn new(start: Point<GameBasis>) -> Self {
+    pub fn new(begin: Point<GameBasis>) -> Self {
         Self {
-            head: start,
-            tail: Vec::new(),
+            segments: vec![Line {
+                begin,
+                end: begin + Point::new(3.0, 0.0),
+            }],
         }
+    }
+
+    pub fn head(&self) -> &Line<GameBasis> {
+        &self.segments.last().unwrap()
+    }
+
+    pub fn mut_head(&mut self) -> &mut Line<GameBasis> {
+        self.segments.last_mut().unwrap()
+    }
+
+    pub fn first(&self) -> &Line<GameBasis> {
+        &self.segments[0]
+    }
+
+    pub fn mut_first(&mut self) -> &mut Line<GameBasis> {
+        &mut self.segments[0]
     }
 }
 
@@ -60,6 +83,25 @@ impl Input {
     pub fn empty(&self) -> bool {
         !self.up && !self.down && !self.left && !self.right
     }
+
+    pub fn as_vec(&self, length: f32) -> Point<GameBasis> {
+        let mut vec = Point::new(0.0, 0.0);
+
+        if self.up {
+            vec.y -= length;
+        }
+        if self.down {
+            vec.y += length;
+        }
+        if self.left {
+            vec.x -= length;
+        }
+        if self.right {
+            vec.x += length;
+        }
+
+        vec
+    }
 }
 
 /// Read the input from the given input stream.
@@ -82,12 +124,34 @@ fn read_to_input(event: &Option<crossterm::event::KeyEvent>) -> Input {
     input
 }
 
+impl SnakeGame {
+    /// Create a new game instance with the given settings.
+    /// Snake starts at the given point and moves right.
+    /// Tail is 2 points long.
+    pub fn new(setup: Point<GameBasis>) -> Self {
+        Self {
+            snake: Snake::new(setup),
+            apples: Vec::new(),
+            duration: std::time::Duration::from_millis(2),
+            prev_non_empty_input: Input {
+                up: false,
+                down: false,
+                left: false,
+                right: true, // Start moving right
+            },
+            score: Score(0),
+            to_growth: 0.0,
+        }
+    }
+}
+
 pub struct SnakeGame {
     pub snake: Snake,
     pub apples: Vec<Apple>,
     pub prev_non_empty_input: Input,
     pub duration: std::time::Duration,
     pub score: Score,
+    pub to_growth: f32,
 }
 
 impl Game for SnakeGame {
@@ -111,8 +175,11 @@ impl Game for SnakeGame {
         // Check for collisions
         let is_collided = {
             let mut is_collided = false;
-            for point in self.snake.tail.iter() {
-                if self.snake.head.compare(point, MORE_THAN_HALF_CELL) {
+            for segment_ind in 0..self.snake.segments.len() - 1 {
+                let segment = &self.snake.segments[segment_ind];
+                if self.snake.head().intersects(segment)
+                    || segment.distance_to(&self.snake.head().end) < SNAKE_WIDTH
+                {
                     is_collided = true;
                 }
             }
@@ -120,37 +187,33 @@ impl Game for SnakeGame {
         };
 
         // Check for eating food
-        // Modifies self.apples and self.score
-        let is_apple_eaten = {
+        // Modifies self.apples, self.score and self.to_growth
+        {
             let mut i = 0;
-            let mut is_apple_eaten = false;
             while i < self.apples.len() {
                 if self
                     .snake
-                    .head
-                    .compare(&self.apples[i].0, MORE_THAN_HALF_CELL)
+                    .head()
+                    .end
+                    .compare(&self.apples[i].0, apples::RADIUS)
                 {
-                    is_apple_eaten = true;
+                    self.to_growth += apples::GROWTH;
                     self.score += 1;
                     self.apples.remove(i);
                 } else {
                     i += 1;
                 }
             }
-            is_apple_eaten
         };
 
         // Spawn food
         // Zeroes duration if food is spawned
-        if self.duration > APPLES_SPAWN_RATE {
-            if self.apples.len() < APPLES_MAX {
+        if self.duration > apples::SPAWN_RATE {
+            if self.apples.len() < apples::MAX {
                 /// Check if the given coordinates are on the snake
                 fn is_on_snake(snake: &Snake, coords: Point<GameBasis>) -> bool {
-                    if coords.compare(&snake.head, MORE_THAN_HALF_CELL) {
-                        return true;
-                    }
-                    for point in snake.tail.iter() {
-                        if coords.compare(point, MORE_THAN_HALF_CELL) {
+                    for segment in snake.segments.iter() {
+                        if coords.compare(&segment.end, apples::RADIUS) {
                             return true;
                         }
                     }
@@ -160,7 +223,7 @@ impl Game for SnakeGame {
                 /// Check if the given coordinates are on an apple
                 fn is_on_apple(coords: Point<GameBasis>, apples: &[Apple]) -> bool {
                     for apple in apples.iter() {
-                        if coords.compare(&apple.0, MORE_THAN_HALF_CELL) {
+                        if coords.compare(&apple.0, apples::RADIUS) {
                             return true;
                         }
                     }
@@ -194,13 +257,7 @@ impl Game for SnakeGame {
         {
             let screen_size = get_terminal_size();
             let input = read_to_input(input);
-
-            // Move the tail
-            self.snake.tail.push(self.snake.head);
-            // Don't grow the tail if an apple wasn't eaten
-            if !is_apple_eaten {
-                self.snake.tail.remove(0);
-            }
+            let distance_traveled = SNAKE_SPEED * delta_time.as_secs_f32();
 
             let curr_input = if !input.empty()
                 && (input.up && !self.prev_non_empty_input.down
@@ -213,40 +270,49 @@ impl Game for SnakeGame {
                 self.prev_non_empty_input
             };
 
-            // Calculate deltas
-            let deltas = {
-                let mut deltas = Point::<GameBasis>::new(0.0, 0.0);
-                if curr_input.up {
-                    deltas.y -= SNAKE_SPEED * delta_time.as_secs_f32();
+            // Growth head
+            // FIXME bound check
+            if input != self.prev_non_empty_input {
+                let new_head_end = input.as_vec(distance_traveled) + self.snake.head().end;
+                match new_head_end
+                    .bounds_check(screen_size.x.round() as u16, screen_size.y.round() as u16)
+                {
+                    None => self
+                        .snake
+                        .segments
+                        .push(Line::new(self.snake.head().end, new_head_end)),
+                    Some(BoundsCollision::Bottom) => self.snake.segments.push({
+                        let begin = Point::new(self.snake.head().end.x, 0.0);
+                        Line::new(begin, begin + new_head_end)
+                    }),
+                    Some(BoundsCollision::Top) => self.snake.segments.push({
+                        let begin = Point::new(self.snake.head().end.x, screen_size.y);
+                        Line::new(begin, begin + new_head_end)
+                    }),
+                    Some(BoundsCollision::Left) => self.snake.segments.push({
+                        let begin = Point::new(0.0, self.snake.head().end.y);
+                        Line::new(begin, begin + new_head_end)
+                    }),
+                    Some(BoundsCollision::Right) => self.snake.segments.push({
+                        let begin = Point::new(screen_size.x, self.snake.head().end.y);
+                        Line::new(begin, begin + new_head_end)
+                    }),
                 }
-                if curr_input.down {
-                    deltas.y += SNAKE_SPEED * delta_time.as_secs_f32();
-                }
-                if curr_input.left {
-                    deltas.x -= SNAKE_SPEED * delta_time.as_secs_f32();
-                }
-                if curr_input.right {
-                    deltas.x += SNAKE_SPEED * delta_time.as_secs_f32();
-                }
-                deltas
-            };
+            } else {
+                self.snake.mut_head().end += curr_input.as_vec(distance_traveled);
+            }
 
-            // Apply deltas
-            {
-                self.snake.head.x += deltas.x;
-                self.snake.head.y += deltas.y;
-
-                if self.snake.head.x < 0.0 {
-                    self.snake.head.x = screen_size.x - 1.0;
-                }
-                if self.snake.head.x >= screen_size.x {
-                    self.snake.head.x = 0.0;
-                }
-                if self.snake.head.y < 0.0 {
-                    self.snake.head.y = screen_size.y - 1.0;
-                }
-                if self.snake.head.y >= screen_size.y {
-                    self.snake.head.y = 0.0;
+            // Shrink tail
+            let mut to_shrink = self.to_growth.min(distance_traveled);
+            self.to_growth = 0.0_f32.max(self.to_growth - to_shrink);
+            while to_shrink > f32::EPSILON {
+                if self.snake.first().length() > to_shrink {
+                    let first_dir = self.snake.first().direction();
+                    self.snake.mut_first().begin -= first_dir * to_shrink;
+                    to_shrink = 0.0;
+                } else {
+                    to_shrink -= self.snake.first().length();
+                    self.snake.segments.remove(0);
                 }
             }
 
@@ -274,25 +340,40 @@ impl Game for SnakeGame {
 
         // Draw snake
         {
-            let snake_head_on_screen: Point<ScreenBasis> = self.snake.head.into();
+            // Draw snake body
+            for segment in self.snake.segments.iter() {
+                let segment_begin: Point<ScreenBasis> = segment.begin.into();
+                let segment_end: Point<ScreenBasis> = segment.end.into();
+                let segment_direction = (segment_end - segment_begin).normalize();
+                let mut segment_point = segment_begin;
 
-            for point in self
-                .snake
-                .tail
-                .iter()
-                .map(|p| Point::<ScreenBasis>::from(*p))
-            {
-                execute!(out, MoveTo(point.x.round() as u16, point.y.round() as u16))?;
-                write!(out, "++")?;
+                while segment_point.distance_to(&segment_end) > MORE_THAN_HALF_CELL {
+                    execute!(
+                        out,
+                        MoveTo(
+                            segment_point.x.round() as u16,
+                            segment_point.y.round() as u16
+                        )
+                    )?;
+                    write!(out, "{}", "||".green())?;
+
+                    segment_point += segment_direction * MORE_THAN_HALF_CELL;
+                }
             }
-            execute!(
-                out,
-                MoveTo(
-                    snake_head_on_screen.x.round() as u16,
-                    snake_head_on_screen.y.round() as u16
-                )
-            )?;
-            write!(out, "{}", "||".green())?;
+
+            // Draw snake head
+            {
+                let snake_head_on_screen: Point<ScreenBasis> = self.snake.head().end.into();
+
+                execute!(
+                    out,
+                    MoveTo(
+                        snake_head_on_screen.x.round() as u16,
+                        snake_head_on_screen.y.round() as u16
+                    )
+                )?;
+                write!(out, "{}", "||".green())?;
+            }
         }
 
         // Draw apples
@@ -344,33 +425,6 @@ impl Game for SnakeGame {
     fn get_score(&self) -> game::Score {
         game::Score {
             value: self.score.0 as i64,
-        }
-    }
-}
-
-impl SnakeGame {
-    /// Create a new game instance with the given settings.
-    /// Snake starts at the given point and moves right.
-    /// Tail is 2 points long.
-    pub fn new(setup: Point<GameBasis>) -> Self {
-        Self {
-            snake: Snake {
-                head: setup,
-                tail: vec![
-                    Point::new(setup.x - 1.0, setup.y),
-                    Point::new(setup.x - 2.0, setup.y),
-                    Point::new(setup.x - 3.0, setup.y),
-                ],
-            },
-            apples: Vec::new(),
-            duration: std::time::Duration::from_millis(2),
-            prev_non_empty_input: Input {
-                up: false,
-                down: false,
-                left: false,
-                right: true, // Start moving right
-            },
-            score: Score(0),
         }
     }
 }

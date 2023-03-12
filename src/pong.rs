@@ -1,5 +1,5 @@
 use crate::game::{Game, Score, UpdateEvent};
-use crate::point::{BoundsCollision, GameBasis, Point, ScreenBasis};
+use crate::point::{BoundsCollision, GameBasis, Line, Point, ScreenBasis};
 use crossterm::{cursor::MoveTo, event::KeyEvent, execute, style::Print, terminal};
 use rand::Rng;
 
@@ -88,26 +88,19 @@ fn collides(
     prev_ball_pos: &Point<GameBasis>,
     ball_pos: &Point<GameBasis>,
 ) -> bool {
-    let plank_begin = Point::new(
-        plank_pos.x - plank_length / 2.0 - planks::COLLISION_EXTRA_LENGTH,
-        plank_pos.y,
+    let plank = Line::new(
+        Point::new(
+            plank_pos.x - plank_length / 2.0 - planks::COLLISION_EXTRA_LENGTH,
+            plank_pos.y,
+        ),
+        Point::new(
+            plank_pos.x + plank_length / 2.0 + planks::COLLISION_EXTRA_LENGTH,
+            plank_pos.y,
+        ),
     );
-    let plank_end = Point::new(
-        plank_pos.x + plank_length / 2.0 + planks::COLLISION_EXTRA_LENGTH,
-        plank_pos.y,
-    );
-    let plank_direction = plank_begin - plank_end;
-    let s = *ball_pos - *prev_ball_pos;
-    let q = plank_begin - *prev_ball_pos;
+    let ball = Line::new(*prev_ball_pos, *ball_pos);
 
-    let c = plank_direction.cross(&s);
-    if c.abs() < f32::EPSILON {
-        return false;
-    }
-
-    let t = q.cross(&s) / c;
-    let u = q.cross(&plank_direction) / c;
-    (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u)
+    plank.intersects(&ball)
 }
 
 pub struct PongGame {

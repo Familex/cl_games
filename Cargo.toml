@@ -5,6 +5,9 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[registries.crates-io]
+protocol = "sparse"
+
 [dependencies]
 colored = "2.0.0"
 crossterm = "0.26.0"
