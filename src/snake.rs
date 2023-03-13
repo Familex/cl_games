@@ -352,12 +352,14 @@ impl Game for SnakeGame {
             // Draw snake body
             {
                 for segment in self.snake.segments.iter() {
+                    use once_cell::sync::Lazy;
+                    static EPS: Lazy<f32> = Lazy::new(|| 2.0_f32.hypot(1.0_f32));
                     let segment_begin: Point<ScreenBasis> = segment.begin.into();
                     let segment_end: Point<ScreenBasis> = segment.end.into();
                     let segment_direction = (segment_end - segment_begin).normalize();
-                    let mut segment_point = segment_begin;
 
-                    loop {
+                    let mut segment_point = segment_begin;
+                    'draw_segment: loop {
                         execute!(
                             out,
                             MoveTo(
@@ -367,10 +369,11 @@ impl Game for SnakeGame {
                         )?;
                         write!(out, "{}", "()".green())?;
 
-                        segment_point += segment_direction * MORE_THAN_HALF_CELL;
+                        segment_point +=
+                            Point::new(segment_direction.x * 2.0, segment_direction.y * 1.0);
 
-                        if segment_point.distance_to(&segment_end) < MORE_THAN_HALF_CELL {
-                            break;
+                        if segment_point.distance_to(&segment_end) < *EPS {
+                            break 'draw_segment;
                         }
                     }
                 }
