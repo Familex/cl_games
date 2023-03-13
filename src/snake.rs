@@ -364,6 +364,12 @@ impl Game for SnakeGame {
                     let mut segment_point = segment_begin;
                     let segment_length = segment_direction.length();
                     let mut distance_traveled = 0.0;
+                    let angle_to_x_axis = segment_direction_unit.y.atan2(segment_direction_unit.x);
+                    let scale_factor = if angle_to_x_axis.abs() < std::f32::consts::FRAC_PI_4 {
+                        2.0
+                    } else {
+                        1.0
+                    };
                     'draw_segment: loop {
                         execute!(
                             out,
@@ -374,10 +380,13 @@ impl Game for SnakeGame {
                         )?;
                         write!(out, "{}", "()".green())?;
 
-                        segment_point += segment_direction_unit * 2.0;
+                        segment_point += Point::new(
+                            segment_direction_unit.x * scale_factor,
+                            segment_direction_unit.y * scale_factor,
+                        );
 
                         // Update the distance traveled along the segment
-                        distance_traveled += 2.0;
+                        distance_traveled += segment_direction_unit.length() * scale_factor;
                         if distance_traveled >= segment_length {
                             break 'draw_segment;
                         }
