@@ -365,10 +365,18 @@ impl Game for SnakeGame {
                     let segment_length = segment_direction.length();
                     let mut distance_traveled = 0.0;
                     let angle_to_x_axis = segment_direction_unit.y.atan2(segment_direction_unit.x);
-                    let scale_factor = if angle_to_x_axis.abs() < std::f32::consts::FRAC_PI_4 {
-                        2.0
+                    let scale_factor = if segment_direction_unit.x >= 0.0 {
+                        if angle_to_x_axis.abs() < std::f32::consts::FRAC_PI_4 {
+                            2.0
+                        } else {
+                            1.0
+                        }
                     } else {
-                        1.0
+                        if angle_to_x_axis.abs() > std::f32::consts::FRAC_PI_4 {
+                            2.0
+                        } else {
+                            1.0
+                        }
                     };
                     'draw_segment: loop {
                         execute!(
