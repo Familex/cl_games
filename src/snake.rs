@@ -356,9 +356,14 @@ impl Game for SnakeGame {
                     static EPS: Lazy<f32> = Lazy::new(|| 2.0_f32.hypot(1.0_f32));
                     let segment_begin: Point<ScreenBasis> = segment.begin.into();
                     let segment_end: Point<ScreenBasis> = segment.end.into();
-                    let segment_direction = (segment_end - segment_begin).normalize();
+                    let segment_direction = (segment_end - segment_begin);
+
+                    // Calculate the unit vector of segment_direction
+                    let segment_direction_unit = segment_direction / segment_direction.length();
 
                     let mut segment_point = segment_begin;
+                    let segment_length = segment_direction.length();
+                    let mut distance_traveled = 0.0;
                     'draw_segment: loop {
                         execute!(
                             out,
@@ -369,12 +374,22 @@ impl Game for SnakeGame {
                         )?;
                         write!(out, "{}", "()".green())?;
 
-                        segment_point +=
-                            Point::new(segment_direction.x * 2.0, segment_direction.y * 1.0);
+                        segment_point += segment_direction_unit * 2.0;
 
-                        if segment_point.distance_to(&segment_end) < *EPS {
+                        // Update the distance traveled along the segment
+                        distance_traveled += 2.0;
+                        if distance_traveled >= segment_length {
                             break 'draw_segment;
                         }
+                    }
+
+                    // Draw the endpoint of the segment if it was not already drawn
+                    if segment_point.distance_to(&segment_end) >= *EPS {
+                        execute!(
+                            out,
+                            MoveTo(segment_end.x.round() as u16, segment_end.y.round() as u16)
+                        )?;
+                        write!(out, "{}", "()".green())?;
                     }
                 }
             }
