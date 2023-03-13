@@ -190,6 +190,16 @@ pub struct Line<Basis: Copy> {
     pub end: Point<Basis>,
 }
 
+impl<Basis: Copy> std::fmt::Display for Line<Basis> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Line a: {}, b: {}, c: {}, d: {}",
+            self.begin.x, self.begin.y, self.end.x, self.end.y
+        )
+    }
+}
+
 impl<Basis: Copy> Line<Basis> {
     pub fn new(begin: Point<Basis>, end: Point<Basis>) -> Self {
         Self { begin, end }
@@ -226,7 +236,7 @@ impl<Basis: Copy> Line<Basis> {
         let c = *point - self.end;
 
         if a.dot(&b) > 0.0 && a.dot(&c) < 0.0 {
-            a.cross(&b) / a.length()
+            (a.cross(&b) / a.length()).abs()
         } else {
             b.length().min(c.length())
         }

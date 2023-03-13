@@ -11,8 +11,11 @@ mod apples {
     pub const RADIUS: f32 = MORE_THAN_HALF_CELL;
     pub const GROWTH: f32 = 1.0;
 }
-const SNAKE_SPEED: f32 = 12.0;
-const SNAKE_WIDTH: f32 = 0.5;
+mod snakes {
+    pub(crate) const SPEED: f32 = 12.0;
+
+    pub(crate) const WIDTH: f32 = 0.25;
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Apple(Point<GameBasis>);
@@ -40,7 +43,7 @@ impl Snake {
     }
 
     pub fn head(&self) -> &Line<GameBasis> {
-        &self.segments.last().unwrap()
+        self.segments.last().unwrap()
     }
 
     pub fn mut_head(&mut self) -> &mut Line<GameBasis> {
@@ -173,17 +176,21 @@ impl Game for SnakeGame {
         self.duration += *delta_time;
 
         // Check for collisions
-        let is_collided = {
+        let is_collided = if self.snake.segments.len() > 2 {
             let mut is_collided = false;
-            for segment_ind in 0..self.snake.segments.len() - 1 {
+            for segment_ind in 0..self.snake.segments.len() - 2
+            /* last two segments is head and pre-head */
+            {
                 let segment = &self.snake.segments[segment_ind];
                 if self.snake.head().intersects(segment)
-                    || segment.distance_to(&self.snake.head().end) < SNAKE_WIDTH
+                    || segment.distance_to(&self.snake.head().end) < snakes::WIDTH
                 {
                     is_collided = true;
                 }
             }
             is_collided
+        } else {
+            false
         };
 
         // Check for eating food
@@ -256,10 +263,11 @@ impl Game for SnakeGame {
         // Modifies self.snake and self.prev_non_empty_input
         {
             let screen_size = get_terminal_size();
+            let real_screen_size: Point<ScreenBasis> = screen_size.into();
             let input = read_to_input(input);
-            let distance_traveled = SNAKE_SPEED * delta_time.as_secs_f32();
+            let distance_traveled = snakes::SPEED * delta_time.as_secs_f32();
 
-            let curr_input = if !input.empty()
+            let input = if !input.empty()
                 && (input.up && !self.prev_non_empty_input.down
                     || input.down && !self.prev_non_empty_input.up
                     || input.left && !self.prev_non_empty_input.right
@@ -274,9 +282,10 @@ impl Game for SnakeGame {
             // FIXME bound check
             if input != self.prev_non_empty_input {
                 let new_head_end = input.as_vec(distance_traveled) + self.snake.head().end;
-                match new_head_end
-                    .bounds_check(screen_size.x.round() as u16, screen_size.y.round() as u16)
-                {
+                match new_head_end.bounds_check(
+                    real_screen_size.x.round() as u16,
+                    real_screen_size.y.round() as u16,
+                ) {
                     None => self
                         .snake
                         .segments
@@ -299,15 +308,15 @@ impl Game for SnakeGame {
                     }),
                 }
             } else {
-                self.snake.mut_head().end += curr_input.as_vec(distance_traveled);
+                self.snake.mut_head().end += input.as_vec(distance_traveled);
             }
 
             // Shrink tail
-            let mut to_shrink = self.to_growth.min(distance_traveled);
-            self.to_growth = 0.0_f32.max(self.to_growth - to_shrink);
+            let mut to_shrink = 0.0_f32.max(distance_traveled - self.to_growth);
+            self.to_growth = 0.0_f32.max(self.to_growth - distance_traveled);
             while to_shrink > f32::EPSILON {
                 if self.snake.first().length() > to_shrink {
-                    let first_dir = self.snake.first().direction();
+                    let first_dir = self.snake.first().direction() * -1.0;
                     self.snake.mut_first().begin -= first_dir * to_shrink;
                     to_shrink = 0.0;
                 } else {
@@ -316,7 +325,7 @@ impl Game for SnakeGame {
                 }
             }
 
-            self.prev_non_empty_input = curr_input;
+            self.prev_non_empty_input = input;
         };
 
         if is_collided {
@@ -341,27 +350,33 @@ impl Game for SnakeGame {
         // Draw snake
         {
             // Draw snake body
-            for segment in self.snake.segments.iter() {
-                let segment_begin: Point<ScreenBasis> = segment.begin.into();
-                let segment_end: Point<ScreenBasis> = segment.end.into();
-                let segment_direction = (segment_end - segment_begin).normalize();
-                let mut segment_point = segment_begin;
+            {
+                for segment in self.snake.segments.iter() {
+                    let segment_begin: Point<ScreenBasis> = segment.begin.into();
+                    let segment_end: Point<ScreenBasis> = segment.end.into();
+                    let segment_direction = (segment_end - segment_begin).normalize();
+                    let mut segment_point = segment_begin;
 
-                while segment_point.distance_to(&segment_end) > MORE_THAN_HALF_CELL {
-                    execute!(
-                        out,
-                        MoveTo(
-                            segment_point.x.round() as u16,
-                            segment_point.y.round() as u16
-                        )
-                    )?;
-                    write!(out, "{}", "||".green())?;
+                    loop {
+                        execute!(
+                            out,
+                            MoveTo(
+                                segment_point.x.round() as u16,
+                                segment_point.y.round() as u16
+                            )
+                        )?;
+                        write!(out, "{}", "()".green())?;
 
-                    segment_point += segment_direction * MORE_THAN_HALF_CELL;
+                        segment_point += segment_direction * MORE_THAN_HALF_CELL;
+
+                        if segment_point.distance_to(&segment_end) < MORE_THAN_HALF_CELL {
+                            break;
+                        }
+                    }
                 }
             }
 
-            // Draw snake head
+            // Draw snake's head
             {
                 let snake_head_on_screen: Point<ScreenBasis> = self.snake.head().end.into();
 
@@ -372,7 +387,7 @@ impl Game for SnakeGame {
                         snake_head_on_screen.y.round() as u16
                     )
                 )?;
-                write!(out, "{}", "||".green())?;
+                write!(out, "{}", "❮❯".green())?;
             }
         }
 
