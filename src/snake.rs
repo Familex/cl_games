@@ -1,7 +1,6 @@
 use crate::game;
 use crate::game::{Game, UpdateEvent};
 use crate::point::{BoundsCollision, GameBasis, Line, Point, ScreenBasis};
-use crate::util::MORE_THAN_HALF_CELL;
 use crossterm::{cursor, execute, style::Stylize, terminal};
 
 mod apples {
@@ -172,7 +171,6 @@ impl Game for SnakeGame {
             let size = terminal::size().expect("Failed to get terminal size");
             Point::new(size.0 as f32 / 2.0, size.1 as f32)
         }
-
         self.duration += *delta_time;
 
         // Check for collisions
@@ -282,33 +280,49 @@ impl Game for SnakeGame {
             // FIXME bound check
             if input != self.prev_non_empty_input {
                 let new_head_end = input.as_vec(distance_traveled) + self.snake.head().end;
-                match new_head_end.bounds_check(
-                    real_screen_size.x.round() as u16,
-                    real_screen_size.y.round() as u16,
-                ) {
-                    None => self
-                        .snake
-                        .segments
-                        .push(Line::new(self.snake.head().end, new_head_end)),
-                    Some(BoundsCollision::Bottom) => self.snake.segments.push({
-                        let begin = Point::new(self.snake.head().end.x, 0.0);
-                        Line::new(begin, begin + new_head_end)
-                    }),
-                    Some(BoundsCollision::Top) => self.snake.segments.push({
-                        let begin = Point::new(self.snake.head().end.x, screen_size.y);
-                        Line::new(begin, begin + new_head_end)
-                    }),
-                    Some(BoundsCollision::Left) => self.snake.segments.push({
-                        let begin = Point::new(0.0, self.snake.head().end.y);
-                        Line::new(begin, begin + new_head_end)
-                    }),
-                    Some(BoundsCollision::Right) => self.snake.segments.push({
-                        let begin = Point::new(screen_size.x, self.snake.head().end.y);
-                        Line::new(begin, begin + new_head_end)
-                    }),
-                }
+                self.snake
+                    .segments
+                    .push(Line::new(self.snake.head().end, new_head_end));
             } else {
-                self.snake.mut_head().end += input.as_vec(distance_traveled);
+                let new_head_end = input.as_vec(distance_traveled) + self.snake.head().end;
+                if matches!(
+                    new_head_end.bounds_check(
+                        real_screen_size.x.round() as u16,
+                        real_screen_size.y.round() as u16,
+                    ),
+                    None
+                ) {
+                    self.snake.mut_head().end += input.as_vec(distance_traveled);
+                } else {
+                    self.snake.segments.push({
+                        match new_head_end.bounds_check(
+                            real_screen_size.x.round() as u16,
+                            real_screen_size.y.round() as u16,
+                        ) {
+                            None => unreachable!("Should have been handled above"),
+                            Some(BoundsCollision::Bottom) => {
+                                let begin = Point::new(self.snake.head().end.x, 0.0);
+                                let new_head_end = new_head_end - Point::new(0.0, screen_size.y);
+                                Line::new(begin, new_head_end)
+                            }
+                            Some(BoundsCollision::Top) => {
+                                let begin = Point::new(self.snake.head().end.x, screen_size.y);
+                                let new_head_end = new_head_end + Point::new(0.0, screen_size.y);
+                                Line::new(begin, new_head_end)
+                            }
+                            Some(BoundsCollision::Left) => {
+                                let begin = Point::new(screen_size.x, self.snake.head().end.y);
+                                let new_head_end = new_head_end + Point::new(screen_size.x, 0.0);
+                                Line::new(begin, new_head_end)
+                            }
+                            Some(BoundsCollision::Right) => {
+                                let begin = Point::new(0.0, self.snake.head().end.y);
+                                let new_head_end = new_head_end - Point::new(screen_size.x, 0.0);
+                                Line::new(begin, new_head_end)
+                            }
+                        }
+                    });
+                }
             }
 
             // Shrink tail
@@ -356,7 +370,7 @@ impl Game for SnakeGame {
                     static EPS: Lazy<f32> = Lazy::new(|| 2.0_f32.hypot(1.0_f32));
                     let segment_begin: Point<ScreenBasis> = segment.begin.into();
                     let segment_end: Point<ScreenBasis> = segment.end.into();
-                    let segment_direction = (segment_end - segment_begin);
+                    let segment_direction = segment_end - segment_begin;
 
                     // Calculate the unit vector of segment_direction
                     let segment_direction_unit = segment_direction / segment_direction.length();
@@ -371,12 +385,10 @@ impl Game for SnakeGame {
                         } else {
                             1.0
                         }
+                    } else if angle_to_x_axis.abs() > std::f32::consts::FRAC_PI_4 {
+                        2.0
                     } else {
-                        if angle_to_x_axis.abs() > std::f32::consts::FRAC_PI_4 {
-                            2.0
-                        } else {
-                            1.0
-                        }
+                        1.0
                     };
                     'draw_segment: loop {
                         execute!(

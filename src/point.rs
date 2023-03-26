@@ -170,7 +170,7 @@ impl Point<ScreenBasis> {
             Some(BoundsCollision::Bottom)
         } else if self.x.round() < 0.0 {
             Some(BoundsCollision::Left)
-        } else if self.x.round() > screen_width as f32 - 2.0 {
+        } else if self.x.round() > screen_width as f32 {
             Some(BoundsCollision::Right)
         } else {
             None
