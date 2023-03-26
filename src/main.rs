@@ -18,6 +18,8 @@ enum MenuChoice {
     LastElement, // for static check
 }
 
+const BETWEEN_FRAMES_TIME_MS: u64 = 1000 / 60;
+
 fn main() -> crossterm::Result<()> {
     use crossterm::{cursor, event::read, execute, terminal};
     use game::Game;
@@ -113,7 +115,7 @@ fn main() -> crossterm::Result<()> {
             )?;
 
             // Wait for the next frame
-            thread::sleep(Duration::from_millis(10));
+            thread::sleep(Duration::from_millis(BETWEEN_FRAMES_TIME_MS));
 
             prev_time = current_time;
         }
