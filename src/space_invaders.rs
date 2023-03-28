@@ -7,7 +7,8 @@ use std::time::Duration;
 const FOR_ENEMY_SCORE: usize = 1;
 const FOR_PROP_SCORE: usize = 0;
 const FIRE_BULLET_OFFSET: f32 = 1.0;
-const PLAYER_SPEED: f32 = 10.0;
+const PLAYER_SPEED: f32 = 1.0;
+const PLAYER_FIRE_RATE: Duration = Duration::from_millis(500);
 const GAME_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
 
 pub fn is_success(chance: f32) -> bool {
@@ -156,6 +157,7 @@ pub struct SpaceInvadersGame {
     props: Vec<Prop>,
     player: Player,
     from_last_update: Duration,
+    from_last_fire: Duration,
 }
 
 pub enum EnemyPreset {
@@ -293,6 +295,7 @@ impl SpaceInvadersGame {
                 .into(),
             },
             from_last_update: Duration::from_nanos(0),
+            from_last_fire: Duration::from_nanos(0),
         }
     }
 }
@@ -328,6 +331,17 @@ impl Game for SpaceInvadersGame {
                 })
             );
 
+            // deltas
+            {
+                // enemies delta
+                for enemy in &mut self.enemies {
+                    enemy.behavior.delta(*delta_time);
+                }
+
+                // player fire delta
+                self.from_last_fire += *delta_time;
+            }
+
             // player movement
             // modifies self.player
             {
@@ -336,28 +350,31 @@ impl Game for SpaceInvadersGame {
                         code: crossterm::event::KeyCode::Left,
                         ..
                     }) => Some(Point::new(
-                        self.player.position.x - PLAYER_SPEED * delta_time.as_secs_f32(),
+                        self.player.position.x - PLAYER_SPEED,
                         self.player.position.y,
                     )),
                     Some(crossterm::event::KeyEvent {
                         code: crossterm::event::KeyCode::Right,
                         ..
                     }) => Some(Point::new(
-                        self.player.position.x + PLAYER_SPEED * delta_time.as_secs_f32(),
+                        self.player.position.x + PLAYER_SPEED,
                         self.player.position.y,
                     )),
                     Some(crossterm::event::KeyEvent {
                         code: crossterm::event::KeyCode::Char(' '),
                         ..
                     }) => {
-                        self.bullets.push(Bullet {
-                            move_direction: Direction::Up,
-                            position: Point::new(
-                                self.player.position.x,
-                                self.player.position.y - 1.0,
-                            ),
-                            speed: 1.0,
-                        });
+                        if self.from_last_fire > PLAYER_FIRE_RATE {
+                            self.from_last_fire = Duration::from_nanos(0);
+                            self.bullets.push(Bullet {
+                                move_direction: Direction::Up,
+                                position: Point::new(
+                                    self.player.position.x,
+                                    self.player.position.y - 1.0,
+                                ),
+                                speed: 1.0,
+                            });
+                        }
                         None
                     }
                     _ => None,
@@ -386,13 +403,6 @@ impl Game for SpaceInvadersGame {
                     .position
                     .compare(&bullet.position, MORE_THAN_HALF_CELL)
             });
-
-            // enemies behavior delta
-            {
-                for enemy in &mut self.enemies {
-                    enemy.behavior.delta(*delta_time);
-                }
-            }
 
             (quit_requested, is_player_collided)
         };
