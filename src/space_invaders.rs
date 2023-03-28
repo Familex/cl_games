@@ -8,7 +8,7 @@ const FOR_ENEMY_SCORE: usize = 1;
 const FOR_PROP_SCORE: usize = 0;
 const FIRE_BULLET_OFFSET: f32 = 1.0;
 const PLAYER_SPEED: f32 = 10.0;
-const GAME_UPDATE_INTERVAL: Duration = Duration::from_millis(500);
+const GAME_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
 
 pub fn is_success(chance: f32) -> bool {
     let mut rng = rand::thread_rng();
@@ -387,6 +387,13 @@ impl Game for SpaceInvadersGame {
                     .compare(&bullet.position, MORE_THAN_HALF_CELL)
             });
 
+            // enemies behavior delta
+            {
+                for enemy in &mut self.enemies {
+                    enemy.behavior.delta(*delta_time);
+                }
+            }
+
             (quit_requested, is_player_collided)
         };
 
@@ -481,7 +488,6 @@ impl Game for SpaceInvadersGame {
                             }
                         }
                     }
-                    behavior.delta(*delta_time);
                 }
 
                 self.enemies = new_enemies;
@@ -614,18 +620,28 @@ impl Game for SpaceInvadersGame {
 
         // enemies
         {
-            for enemy_screen_position in self
-                .enemies
-                .iter()
-                .map(|e| Point::<ScreenBasis>::from(e.position))
-            {
+            let enemy_rows: Vec<Vec<char>> = {
+                let mut enemy_rows = vec![vec![' '; max_x as usize]; max_y as usize];
+
+                for enemy in &self.enemies {
+                    let enemy_screen_position = enemy.position;
+
+                    let enemy_row = &mut enemy_rows[enemy_screen_position.y as usize];
+
+                    if enemy_screen_position.x.round() as u16 * 2 < max_x {
+                        enemy_row[enemy_screen_position.x as usize * 2] = '◥';
+                        enemy_row[enemy_screen_position.x as usize * 2 + 1] = '◤';
+                    }
+                }
+
+                enemy_rows
+            };
+
+            for (ind, enemy_row) in enemy_rows.iter().enumerate() {
                 execute!(
                     out,
-                    MoveTo(
-                        enemy_screen_position.x as u16,
-                        enemy_screen_position.y as u16
-                    ),
-                    Print("◥◤".red())
+                    MoveTo(0, ind as u16),
+                    Print(enemy_row.iter().collect::<String>().red())
                 )?;
             }
         }
