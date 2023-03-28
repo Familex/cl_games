@@ -92,6 +92,7 @@ fn main() -> crossterm::Result<()> {
             use std::time::SystemTime;
 
             let current_time = SystemTime::now();
+            let delta = &current_time.duration_since(prev_time).unwrap();
 
             // Clear the screen
             execute!(
@@ -101,18 +102,20 @@ fn main() -> crossterm::Result<()> {
             )?;
 
             // Update the game state
-            if let game::UpdateEvent::GameOver = game.update(
-                &read_input(&stdin_chan),
-                &current_time.duration_since(prev_time).unwrap(),
-            ) {
+            if let game::UpdateEvent::GameOver = game.update(&read_input(&stdin_chan), delta) {
                 break 'game_loop;
             }
 
             // Draw the game state
-            game.draw(
-                &mut stdout,
-                &current_time.duration_since(prev_time).unwrap(),
-            )?;
+            game.draw(&mut stdout, delta)?;
+
+            // draw delta
+            {
+                use std::io::Write;
+                execute!(stdout, cursor::MoveTo(0, 0))?;
+                write!(stdout, "Delta: {}", delta.as_nanos() as f32 / 1_000_000.0)?;
+                stdout.flush()?;
+            }
 
             // Wait for the next frame
             thread::sleep(Duration::from_millis(BETWEEN_FRAMES_TIME_MS));
