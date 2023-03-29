@@ -1,4 +1,4 @@
-use crate::game;
+use crate::game::{self, EXIT_BUTTON};
 use crate::game::{Game, UpdateEvent};
 use crate::point::{BoundsCollision, GameBasis, Line, Point, ScreenBasis};
 use crossterm::{cursor, execute, style::Stylize, terminal};
@@ -172,6 +172,13 @@ impl Game for SnakeGame {
             Point::new(size.0 as f32 / 2.0, size.1 as f32)
         }
         self.duration += *delta_time;
+
+        // quit
+        if let Some(key) = input {
+            if key.code == EXIT_BUTTON {
+                return UpdateEvent::GameOver;
+            }
+        }
 
         // Check for collisions
         let is_collided = if self.snake.segments.len() > 2 {

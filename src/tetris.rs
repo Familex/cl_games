@@ -1,4 +1,4 @@
-use crate::game::{Game, Score, UpdateEvent};
+use crate::game::{Game, Score, UpdateEvent, EXIT_BUTTON};
 use crate::point::{GameBasis, Point, ScreenBasis};
 use colored::Colorize;
 use crossterm::style::Stylize;
@@ -257,6 +257,13 @@ impl Game for TetrisGame {
     ) -> UpdateEvent {
         self.from_prev_descend += *delta_time;
         self.from_last_user_input += *delta_time;
+
+        // quit
+        if let Some(key) = input {
+            if key.code == EXIT_BUTTON {
+                return UpdateEvent::GameOver;
+            }
+        }
 
         // Game over handle (TODO rework all update function, because it looks strange)
         {

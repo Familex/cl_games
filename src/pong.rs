@@ -1,4 +1,4 @@
-use crate::game::{Game, Score, UpdateEvent};
+use crate::game::{Game, Score, UpdateEvent, EXIT_BUTTON};
 use crate::point::{BoundsCollision, GameBasis, Line, Point, ScreenBasis};
 use crossterm::{cursor::MoveTo, event::KeyEvent, execute, style::Print, terminal};
 use rand::Rng;
@@ -150,9 +150,9 @@ impl Game for PongGame {
 
         let (width, height) = terminal::size().expect("Failed to get terminal size");
 
-        // quit on Esc
+        // quit
         if let Some(key) = input {
-            if key.code == crossterm::event::KeyCode::Esc {
+            if key.code == EXIT_BUTTON {
                 return UpdateEvent::GameOver;
             }
         }

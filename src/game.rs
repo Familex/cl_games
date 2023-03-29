@@ -7,6 +7,7 @@ pub enum UpdateEvent {
 pub struct Score {
     pub value: i64,
 }
+pub const EXIT_BUTTON: crossterm::event::KeyCode = crossterm::event::KeyCode::Esc;
 
 /// A trait that defines the interface for a game.
 pub trait Game {

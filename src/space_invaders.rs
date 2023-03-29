@@ -1,4 +1,4 @@
-use crate::game::{Game, Score, UpdateEvent};
+use crate::game::{Game, Score, UpdateEvent, EXIT_BUTTON};
 use crate::point::{GameBasis, Point, ScreenBasis};
 use crate::util::MORE_THAN_HALF_CELL;
 use rand::Rng;
@@ -320,17 +320,15 @@ impl Game for SpaceInvadersGame {
             self.from_last_update += *delta_time;
         }
 
-        // what not depends on self.last_update_time
-        let (quit_requested, is_player_collided) = {
-            // quit request
-            let quit_requested = matches!(
-                input,
-                Some(crossterm::event::KeyEvent {
-                    code: crossterm::event::KeyCode::Char('q'),
-                    ..
-                })
-            );
+        // quit
+        if let Some(key) = input {
+            if key.code == EXIT_BUTTON {
+                return UpdateEvent::GameOver;
+            }
+        }
 
+        // what not depends on self.last_update_time
+        let is_player_collided = {
             // deltas
             {
                 // enemies delta
@@ -404,7 +402,7 @@ impl Game for SpaceInvadersGame {
                     .compare(&bullet.position, MORE_THAN_HALF_CELL)
             });
 
-            (quit_requested, is_player_collided)
+            is_player_collided
         };
 
         // what depends on self.last_update_time
@@ -610,7 +608,7 @@ impl Game for SpaceInvadersGame {
             }
         }
 
-        if is_player_collided || quit_requested || self.enemies.is_empty() {
+        if is_player_collided || self.enemies.is_empty() {
             UpdateEvent::GameOver
         } else {
             UpdateEvent::GameContinue
